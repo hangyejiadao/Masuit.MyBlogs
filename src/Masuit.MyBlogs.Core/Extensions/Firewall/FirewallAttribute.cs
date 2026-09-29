@@ -116,7 +116,7 @@ public sealed class FirewallAttribute : IAsyncActionFilter
 
         //白名单地区
         var ipLocation = context.HttpContext.Connection.RemoteIpAddress.GetIPLocation();
-        var (location, network, pos) = ipLocation;
+        var (_, _, pos) = ipLocation;
         pos += ipLocation.Coodinate;
         var allowedAreas = CommonHelper.SystemSettings.GetOrAdd("AllowedArea", "").Split(Separator, StringSplitOptions.RemoveEmptyEntries);
         if (allowedAreas.Length != 0 && pos.Contains(allowedAreas))
@@ -127,7 +127,7 @@ public sealed class FirewallAttribute : IAsyncActionFilter
 
         //黑名单地区
         var denyAreas = CommonHelper.SystemSettings.GetOrAdd("DenyArea", "").Split(Separator, StringSplitOptions.RemoveEmptyEntries);
-        if (denyAreas.Length != 0 && (string.IsNullOrWhiteSpace(location) || string.IsNullOrWhiteSpace(network) || pos.Contains(denyAreas) || denyAreas.Intersect(pos.Split("|")).Any()))
+        if (denyAreas.Length != 0 && (pos.Contains(denyAreas) || denyAreas.Intersect(pos.Split("|")).Any()))
         {
             // 未知地区的，未知网络的，禁区的
             await AccessDeny(ip, request, "访问地区限制");

@@ -1,0 +1,88 @@
+# ---------------------------------------------------------------------------
+# Production deployment for Masuit.MyBlogs (backend only).
+#
+# Usage on the server:
+#   cd /opt/masuit-myblogs
+#   cp .env.example .env      # first time only, then edit it
+#   docker compose pull
+#   docker compose up -d
+#
+# Required configuration lives on the host, NOT inside this file:
+#   ./appsettings.json        -> database / redis / https settings
+#   ./App_Data/               -> IP databases, word lists, optional TLS cert
+#   ./logs/ ./lucene/ ./wwwroot-upload/  -> created automatically
+# ---------------------------------------------------------------------------
+services:
+  web:
+    image: ${IMAGE:-ghcr.io/hangyejiadao/masuit.myblogs:latest}
+    container_name: masuit-myblogs
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      TZ: Asia/Shanghai
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    volumes:
+      # Config must be editable on the host without rebuilding the image.
+      - ./appsettings.json:/app/appsettings.json:ro
+      # IP databases, custom word lists, optional TLS certificate, ...
+      - ./App_Data:/app/App_Data
+      # Runtime data that must survive container recreation.
+      - ./logs:/app/logs
+      - ./lucene:/app/lucene
+      - ./wwwroot-upload:/app/wwwroot/upload
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # NOTE: do not use /ping here - it is an infinite text/event-stream (SSE).
+      test: ["CMD-SHELL", "curl -fsS -m 5 -o /dev/null http://127.0.0.1:5000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL. Disable this service (and remove `depends_on`) when using an
+  # external database, then update appsettings.json -> Database:ConnString.
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    container_name: masuit-myblogs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-myblogs}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-myblogs}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------------------------------
+  # Redis. Disable when using an external Redis, then update
+  # appsettings.json -> Redis.
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:8-alpine
+    container_name: masuit-myblogs-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

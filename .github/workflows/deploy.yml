@@ -1,0 +1,168 @@
+name: Deploy Backend
+
+# ---------------------------------------------------------------------------
+# Builds the backend Docker image, pushes it to GHCR, then deploys it to the
+# server over SSH by running `docker compose pull && up -d`.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   SERVER_HOST   - e.g. 49.51.199.210
+#   SERVER_USER   - e.g. root  (or a user with docker permission)
+#   SERVER_SSH_KEY - private SSH key that can log in to the server
+#   SERVER_PORT   - optional, defaults to 22
+#
+# Optional repository variables:
+#   DEPLOY_PATH   - absolute path on the server, defaults to /opt/masuit-myblogs
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  # -------------------------------------------------------------------------
+  # 1) Build the image and push it to GitHub Container Registry.
+  # -------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      # GHCR requires an all-lowercase image name.
+      image: ${{ env.REGISTRY }}/${{ steps.name.outputs.lower }}:${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute lowercase image name
+        id: name
+        run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.name.outputs.lower }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # -------------------------------------------------------------------------
+  # 2) Deploy to the server.
+  # -------------------------------------------------------------------------
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/masuit-myblogs' }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          BRANCH: ${{ github.ref_name }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: IMAGE,DEPLOY_PATH,REPO_URL,BRANCH
+          script_stop: true
+          script: |
+            set -e
+            : "${DEPLOY_PATH:=/opt/masuit-myblogs}"
+            COMPOSE_DIR="$DEPLOY_PATH/deploy"
+            echo "Deploying $IMAGE to $COMPOSE_DIR"
+
+            # Sync the repository (compose files + default config templates).
+            # Host-owned runtime files are untracked and therefore preserved.
+            mkdir -p "$DEPLOY_PATH"
+            if [ -d "$DEPLOY_PATH/.git" ]; then
+              git -C "$DEPLOY_PATH" fetch --depth 1 origin "$BRANCH"
+              git -C "$DEPLOY_PATH" reset --hard FETCH_HEAD
+            else
+              git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            # --- First-run bootstrap -------------------------------------
+            if [ ! -f "$COMPOSE_DIR/appsettings.json" ]; then
+              cp "$DEPLOY_PATH/src/Masuit.MyBlogs.Core/appsettings.json" "$COMPOSE_DIR/appsettings.json"
+              echo ">> bootstrapped appsettings.json (EDIT IT before going live)"
+            fi
+            if [ ! -d "$COMPOSE_DIR/App_Data" ]; then
+              cp -r "$DEPLOY_PATH/src/Masuit.MyBlogs.Core/App_Data" "$COMPOSE_DIR/App_Data"
+              echo ">> bootstrapped App_Data"
+            fi
+            if [ ! -f "$COMPOSE_DIR/.env" ]; then
+              cp "$COMPOSE_DIR/.env.example" "$COMPOSE_DIR/.env"
+              echo ">> bootstrapped .env (EDIT IT before going live)"
+            fi
+
+            cd "$COMPOSE_DIR"
+
+            # Pin the freshly built image for this release.
+            if grep -q '^IMAGE=' .env; then
+              sed -i "s|^IMAGE=.*|IMAGE=$IMAGE|" .env
+            else
+              echo "IMAGE=$IMAGE" >> .env
+            fi
+
+            docker compose pull web
+            docker compose up -d --remove-orphans
+
+            # Remove dangling images left over from previous releases.
+            docker image prune -f
+
+            echo "Waiting for the container to become healthy..."
+            for i in $(seq 1 30); do
+              status=$(docker inspect --format '{{.State.Health.Status}}' masuit-myblogs 2>/dev/null || echo starting)
+              echo "  [$i/30] health=$status"
+              if [ "$status" = "healthy" ]; then
+                break
+              fi
+              if [ "$status" = "unhealthy" ]; then
+                echo "Container is unhealthy. Recent logs:"
+                docker compose logs --tail=80 web
+                echo "Hint: check $COMPOSE_DIR/appsettings.json (Database:ConnString must use host 'postgres', Redis must use host 'redis')."
+                exit 1
+              fi
+              sleep 5
+            done
+
+            docker compose ps
+            echo "Deployment finished."

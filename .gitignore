@@ -264,9 +264,10 @@ __pycache__/
 结巴分词
 lucenedir
 /Masuit.MyBlogs.WebApp/upload
-Test
-/Masuit.LuceneEFCore.SearchEngine
-/Masuit.Tools
+# NOTE: introduced when the tool libraries lived in sibling directories.
+# They are now part of this repository under src/, so keep only a root-level
+# /Test ignore (anchored) and do not exclude the in-repo libraries.
+/Test
 /src/Masuit.MyBlogs.Core/lucene
 /src/Masuit.MyBlogs.Core/appsettings.prod.json
 /src/Masuit.MyBlogs.Core/Controllers/TestController.cs
@@ -279,3 +280,15 @@ Test
 static
 /front/public/test.html
 .vscode/settings.json
+
+# ---------------------------------------------------------------------------
+# Deployment: host-owned runtime files live next to deploy/docker-compose.yml
+# on the server. They are never committed - see deploy/.env.example.
+# ---------------------------------------------------------------------------
+deploy/.env
+deploy/appsettings.json
+deploy/App_Data/
+deploy/data/
+deploy/logs/
+deploy/lucene/
+deploy/wwwroot-upload/

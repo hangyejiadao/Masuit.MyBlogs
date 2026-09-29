@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Keep the Docker build context small.
+# ---------------------------------------------------------------------------
+
+# Git / editor / OS noise
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.vs
+.idea
+**/.DS_Store
+**/Thumbs.db
+
+# Build output
+**/bin/
+**/obj/
+publish-test/
+publish/
+
+# Frontend dependencies (source is kept; node_modules is huge)
+front/node_modules/
+front/dist/
+
+# Database dump (not needed to build the app)
+database/
+
+# Tool libraries: their test / demo / benchmark projects are not needed
+# to compile the web application.
+src/Masuit.Tools/BenchmarkTest/
+src/Masuit.Tools/NetCoreTest/
+src/Masuit.Tools/Test/
+src/Masuit.Tools/Masuit.Tools.Net45/
+src/Masuit.Tools/Masuit.Tools.AspNetCore.ResumeFileResults.WebTest/
+src/Masuit.Tools/Masuit.Tools.DigtalWatermarker/
+src/Masuit.Tools/Masuit.Tools.NoSQL.MongoDBClient/
+src/Masuit.Tools/.gitee/
+src/Masuit.Tools/.github/
+src/Masuit.LuceneEFCore.SearchEngine/WebSearchDemo/

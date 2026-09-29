@@ -155,15 +155,25 @@ jobs:
             $SUDO docker tag "$IMAGE" "$LOCAL_IMAGE"
             $SUDO docker compose up -d --no-build app
 
+            # The image has no HEALTHCHECK, so poll the published port instead.
+            # On a connection failure curl both prints 000 and exits non-zero, so
+            # the status must come from the fallback assignment, not from `|| echo`.
             echo "Waiting for http://127.0.0.1:$APP_PORT/ to answer..."
+            ready=""
             for i in $(seq 1 30); do
-              code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$APP_PORT/" || echo 000)
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$APP_PORT/" 2>/dev/null) || code="000"
               echo "  [$i/30] http=$code"
               if [ "$code" != "000" ]; then
+                ready=1
                 break
               fi
               sleep 5
             done
+            if [ -z "$ready" ]; then
+              echo "ERROR: the app did not answer on port $APP_PORT within 150s." >&2
+              $SUDO docker compose logs --tail=80 app
+              exit 1
+            fi
 
             $SUDO docker compose ps
             echo "Deployment finished."

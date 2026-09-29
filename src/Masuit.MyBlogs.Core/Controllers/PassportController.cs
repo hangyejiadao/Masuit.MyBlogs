@@ -193,7 +193,7 @@ public sealed class PassportController : Controller
     /// <returns></returns>
     public ActionResult ValidateCode([FromServices] IRedisClient redis)
     {
-        string code = redis.GetOrAdd("captcha:" + ClientIP, Tools.Strings.ValidateCode.CreateValidateCode(6), TimeSpan.FromSeconds(5));
+        string code = redis.GetOrAdd("captcha:" + ClientIP, Tools.Strings.ValidateCode.CreateValidateCode(4), TimeSpan.FromSeconds(5));
         HttpContext.SetRedisSession("valid", code); //将验证码生成到Session中
         var stream = code.CreateValidateGraphic().RegisterDisposeScope();
         return this.ResumeFile(stream, ContentType.Jpeg, "验证码.jpg");

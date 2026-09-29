@@ -52,7 +52,7 @@ public sealed class FirewallController(IHttpClientFactory httpClientFactory) : C
     [ResponseCache(NoStore = true, Duration = 0)]
     public ActionResult CaptchaChallenge()
     {
-        string code = RedisClient.GetOrAdd("captcha:" + HttpContext.Connection.RemoteIpAddress.ToString(), ValidateCode.CreateValidateCode(6), TimeSpan.FromSeconds(5));
+        string code = RedisClient.GetOrAdd("captcha:" + HttpContext.Connection.RemoteIpAddress.ToString(), ValidateCode.CreateValidateCode(4), TimeSpan.FromSeconds(5));
         HttpContext.Session.Set("challenge-captcha", code);
         var stream = code.CreateValidateGraphic().RegisterDisposeScope();
         return this.ResumeFile(stream, ContentType.Jpeg, "验证码.jpg");

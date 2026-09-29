@@ -13,7 +13,7 @@ public static class ValidateCode
 {
     public static string CreateValidateCode(int length)
     {
-        string ch = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ1234567890@#$%&?";
+        string ch = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ1234567890";
         byte[] b = new byte[4];
         using var cpt = RandomNumberGenerator.Create();
         cpt.GetBytes(b);

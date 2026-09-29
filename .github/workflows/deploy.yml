@@ -1,17 +1,18 @@
 name: Deploy Backend
 
 # ---------------------------------------------------------------------------
-# Builds the backend Docker image, pushes it to GHCR, then deploys it to the
-# server over SSH by running `docker compose pull && up -d`.
+# Builds the backend Docker image, pushes it to GHCR, then refreshes the app
+# image of the existing compose stack on the server and recreates only the
+# `app` service. The database, Redis, volumes and nginx config are untouched.
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
 #   SERVER_HOST   - e.g. 49.51.199.210
-#   SERVER_USER   - e.g. root  (or a user with docker permission)
+#   SERVER_USER   - e.g. ubuntu  (needs docker access or passwordless sudo)
 #   SERVER_SSH_KEY - private SSH key that can log in to the server
 #   SERVER_PORT   - optional, defaults to 22
 #
 # Optional repository variables:
-#   DEPLOY_PATH   - absolute path on the server, defaults to /opt/masuit-myblogs
+#   DEPLOY_PATH   - compose directory on the server, defaults to /opt/myblogs
 # ---------------------------------------------------------------------------
 
 on:
@@ -85,7 +86,8 @@ jobs:
           cache-to: type=gha,mode=max
 
   # -------------------------------------------------------------------------
-  # 2) Deploy to the server.
+  # 2) Deploy to the server: retag the freshly built image as the local tag the
+  #    production compose file references, then recreate only the app service.
   # -------------------------------------------------------------------------
   deploy:
     needs: build
@@ -95,29 +97,30 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ${{ needs.build.outputs.image }}
-          # Empty when the variable is unset; the script then falls back to
-          # "$HOME/masuit-myblogs" (works for unprivileged users like 'ubuntu').
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          REPO_URL: https://github.com/${{ github.repository }}.git
-          BRANCH: ${{ github.ref_name }}
+          # Directory that holds the production docker-compose.yml.
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/myblogs' }}
+          # Local tag the compose file references. The freshly built image is
+          # retagged onto it, so docker-compose.yml never has to change.
+          LOCAL_IMAGE: myblogs/app:latest
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs: IMAGE,DEPLOY_PATH,REPO_URL,BRANCH
+          envs: IMAGE,DEPLOY_PATH,LOCAL_IMAGE
           # Do NOT enable script_stop here: drone-ssh implements it by splitting
           # the script into one line per command and appending an exit-code guard
           # after every line. That guard also runs after an `if <test>; then` line,
-          # where $? is the test's own status, so a false test (e.g. the first-run
-          # "no .git yet" check) aborts the deploy immediately with exit code 1.
+          # where $? is the test's own status, so a false test aborts the deploy
+          # immediately with exit code 1 and no output at all.
           # The script already starts with `set -e`, which gives correct
           # stop-on-error semantics for multi-line if/else and for/do blocks.
           script: |
             set -e
-            : "${DEPLOY_PATH:=$HOME/masuit-myblogs}"
-            COMPOSE_DIR="$DEPLOY_PATH/deploy"
-            echo "Deploying $IMAGE to $COMPOSE_DIR"
+            : "${DEPLOY_PATH:=/opt/myblogs}"
+            : "${LOCAL_IMAGE:=myblogs/app:latest}"
+            cd "$DEPLOY_PATH"
+            echo "Deploying $IMAGE to $DEPLOY_PATH (local tag: $LOCAL_IMAGE)"
 
             # Docker access: use the daemon directly when the user is in the
             # 'docker' group, otherwise fall back to passwordless sudo.
@@ -133,57 +136,31 @@ jobs:
             fi
             echo "Docker access: ${SUDO:-(direct)}"
 
-            # Sync the repository (compose files + default config templates).
-            # Host-owned runtime files are untracked and therefore preserved.
-            mkdir -p "$DEPLOY_PATH"
-            if [ -d "$DEPLOY_PATH/.git" ]; then
-              git -C "$DEPLOY_PATH" fetch --depth 1 origin "$BRANCH"
-              git -C "$DEPLOY_PATH" reset --hard FETCH_HEAD
-            else
-              git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$DEPLOY_PATH"
+            # Host port the compose file publishes, used by the readiness check.
+            APP_PORT=$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+            : "${APP_PORT:=5000}"
+
+            # Keep the release that is currently live so it can be restored with
+            #   docker tag myblogs/app:previous myblogs/app:latest
+            #   docker compose up -d --no-build app
+            if $SUDO docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
+              $SUDO docker tag "$LOCAL_IMAGE" "myblogs/app:previous"
             fi
 
-            # --- First-run bootstrap -------------------------------------
-            if [ ! -f "$COMPOSE_DIR/appsettings.json" ]; then
-              cp "$DEPLOY_PATH/src/Masuit.MyBlogs.Core/appsettings.json" "$COMPOSE_DIR/appsettings.json"
-              echo ">> bootstrapped appsettings.json (EDIT IT before going live)"
-            fi
-            if [ ! -d "$COMPOSE_DIR/App_Data" ]; then
-              cp -r "$DEPLOY_PATH/src/Masuit.MyBlogs.Core/App_Data" "$COMPOSE_DIR/App_Data"
-              echo ">> bootstrapped App_Data"
-            fi
-            if [ ! -f "$COMPOSE_DIR/.env" ]; then
-              cp "$COMPOSE_DIR/.env.example" "$COMPOSE_DIR/.env"
-              echo ">> bootstrapped .env (EDIT IT before going live)"
-            fi
+            echo "Pulling $IMAGE"
+            $SUDO docker pull "$IMAGE"
 
-            cd "$COMPOSE_DIR"
+            # Only the app image is swapped: the compose file pins a local tag, and
+            # db / redis / volumes / nginx keep running exactly as they are.
+            $SUDO docker tag "$IMAGE" "$LOCAL_IMAGE"
+            $SUDO docker compose up -d --no-build app
 
-            # Pin the freshly built image for this release.
-            if grep -q '^IMAGE=' .env; then
-              sed -i "s|^IMAGE=.*|IMAGE=$IMAGE|" .env
-            else
-              echo "IMAGE=$IMAGE" >> .env
-            fi
-
-            $SUDO docker compose pull web
-            $SUDO docker compose up -d --remove-orphans
-
-            # Remove dangling images left over from previous releases.
-            $SUDO docker image prune -f
-
-            echo "Waiting for the container to become healthy..."
+            echo "Waiting for http://127.0.0.1:$APP_PORT/ to answer..."
             for i in $(seq 1 30); do
-              status=$($SUDO docker inspect --format '{{.State.Health.Status}}' masuit-myblogs 2>/dev/null || echo starting)
-              echo "  [$i/30] health=$status"
-              if [ "$status" = "healthy" ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$APP_PORT/" || echo 000)
+              echo "  [$i/30] http=$code"
+              if [ "$code" != "000" ]; then
                 break
-              fi
-              if [ "$status" = "unhealthy" ]; then
-                echo "Container is unhealthy. Recent logs:"
-                $SUDO docker compose logs --tail=80 web
-                echo "Hint: check $COMPOSE_DIR/appsettings.json (Database:ConnString must use host 'postgres', Redis must use host 'redis')."
-                exit 1
               fi
               sleep 5
             done

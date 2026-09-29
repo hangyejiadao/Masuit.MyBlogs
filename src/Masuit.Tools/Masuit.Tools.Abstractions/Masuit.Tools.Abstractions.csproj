@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net6;net8;net9;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Authors>懒得勤快</Authors>
+    <Description>全龄段友好的C#万能工具库，码数吐司库，不管你是菜鸟新手还是骨灰级玩家都能轻松上手，Masuit.Tools基础公共库(适用于.NET4.6.1/.NET Standard2.0及以上项目)，包含一些常用的操作类，大都是静态类，加密解密，反射操作，Excel简单导出，权重随机筛选算法，分布式短id，表达式树，linq扩展，文件压缩，多线程下载和FTP客户端，硬件信息，字符串扩展方法，日期时间扩展操作，中国农历，大文件拷贝，图像裁剪，验证码，断点续传，集合扩展等常用封装。
+            官网教程：https://masuit.tools
+            github：https://github.com/ldqk/Masuit.Tools
+        </Description>
+    <Copyright>懒得勤快，长空X</Copyright>
+    <RepositoryUrl>https://github.com/ldqk/Masuit.Tools</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ldqk/Masuit.Tools</PackageProjectUrl>
+    <PackageTags>Masuit.Tools,工具库,Utility,Crypt,Extensions</PackageTags>
+    <PackageReleaseNotes>Masuit.Tools基础公共库，如有问题请联系作者QQ:3444764617，或者到项目的github反馈问题，详细的API文档在github上:https://github.com/ldqk/Masuit.Tools</PackageReleaseNotes>
+    <Product>Masuit.Tools.Abstractions</Product>
+    <PackageId>Masuit.Tools.Abstractions</PackageId>
+    <RepositoryType></RepositoryType>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <FileVersion>2.5.9</FileVersion>
+    <Company>masuit.org</Company>
+    <AssemblyVersion>2.5.9</AssemblyVersion>
+    <PackageLicenseUrl>https://github.com/ldqk/Masuit.Tools/blob/master/LICENSE</PackageLicenseUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <Title>Masuit.Tools</Title>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netstandard2.0|AnyCPU'">
+    <DocumentationFile></DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Mapping\**" />
+    <EmbeddedResource Remove="Mapping\**" />
+    <None Remove="Mapping\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Reflection\ClassHelper.cs" />
+  </ItemGroup>
+  <ItemGroup>
+      <PackageReference Include="Castle.Core" Version="5.2.1" />
+    <PackageReference Include="DnsClient" Version="1.8.0" />
+    <PackageReference Include="HtmlSanitizer" Version="9.2.1039" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+      <PackageReference Include="System.Collections.Immutable" Version="10.0.12" />
+      <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.12" />
+      <PackageReference Include="System.Management" Version="10.0.12" />
+      <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
+    <PackageReference Include="SkiaSharp" Version="4.152.1" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="IndexRange" Version="1.1.1" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.1'">
+    <PackageReference Include="IndexRange" Version="1.1.1" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Extensions\Dynamics\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+</Project>

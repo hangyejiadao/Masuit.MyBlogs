@@ -1,0 +1,142 @@
+name: 🕷️ BUG反馈🐛
+description: 当你中发现了一个 Bug，导致应用崩溃或抛出异常，或者有一个组件存在问题，或者某些地方看起来不对劲。
+title: "[bug反馈]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 💢 温馨提示：提交后请保证回复及时，若长时间未回复的issue，将在超过30天以后作关闭处理！   ![问题解答价位表](https://pic1.zhimg.com/v2-95757ec9c290826a8298cd23a317a830_r.jpg)
+  - type: dropdown
+    id: version
+    attributes:
+      label: 版本号
+      description: 请选择项目使用的包版本？
+      options:
+        - latest (最新的)
+        - 其他版本（请升级）
+    validations:
+      required: true
+  - type: dropdown
+    id: net_sdk
+    attributes:
+      label: .NET SDK
+      description: 请选择项目使用的 .NET SDK 版本？
+      options:
+        - .NET9
+        - .NET8
+        - .NET7
+        - .NET6
+        - .NET5
+        - .NET Standard
+        - .NET Framework4.6.2+
+        - .NET Framework4.5
+    validations:
+      required: true
+  - type: dropdown
+    id: project_type
+    attributes:
+      label: 项目类型
+      description: 请选择目标项目类型？
+      options:
+        - WebApi
+        - Mvc
+        - Console
+        - Razor Pages
+        - Blazor Server
+        - Blazor App (Auto)
+        - MinApp
+        - WinForm
+        - WPF
+    validations:
+      required: true
+  - type: dropdown
+    id: os_type
+    attributes:
+      label: 操作系统
+      description: 请选择操作系统类型？
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows 8
+        - Windows 7
+        - Ubuntu
+        - CentOS
+        - Debian
+        - Deepin
+        - Red Hat Linux
+        - 其他 Linux
+        - MacOS
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 请选择代码运行环境？
+      options:
+        - 开发环境 (Development)
+        - 生产环境 (Production)
+        - 测试环境 (单元测试/集成测试)
+    validations:
+      required: true
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 应用托管程序
+      description: 请选择应用托管程序软件？
+      options:
+        - Kestrel
+        - Windows Service
+        - IIS
+        - Nginx
+        - k8s
+        - Docker
+        - PodMan
+        - PM2
+        - 单文件
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 如何复现
+      description: 请详细告诉我们如何复现你遇到的问题，如涉及代码，可提供一个最小代码示例，并使用反引号```附上它
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 预期结果
+      description: 请告诉我们你预期会发生什么。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 实际结果
+      description: 请告诉我们实际发生了什么。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 异常信息
+      description: 如果有异常请把详细异常堆栈粘贴上来。
+  - type: textarea
+    attributes:
+      label: 截图或视频
+      description: 如果可以的话，上传任何关于 bug 的截图。
+      placeholder: |
+        可在此处进行图片粘贴上传。
+    validations:
+      required: true
+  - type: input
+    id: demo
+    attributes:
+      label: Demo 地址（Git/网盘/SVN）
+      description: 请提供复现错误的 Demo 下载
+      placeholder: https://github.com/your_id/your_test_project.git
+    validations:
+      required: true

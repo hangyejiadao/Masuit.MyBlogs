@@ -34,9 +34,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\Masuit.LuceneEFCore.SearchEngine\Masuit.LuceneEFCore.SearchEngine\Masuit.LuceneEFCore.SearchEngine.csproj" />
-        <ProjectReference Include="..\..\..\Masuit.Tools\Masuit.Tools.AspNetCore\Masuit.Tools.AspNetCore.csproj" />
-        <ProjectReference Include="..\..\..\Masuit.Tools\Masuit.Tools.Excel\Masuit.Tools.Excel.csproj" />
+        <ProjectReference Include="..\Masuit.LuceneEFCore.SearchEngine\Masuit.LuceneEFCore.SearchEngine\Masuit.LuceneEFCore.SearchEngine.csproj" />
+        <ProjectReference Include="..\Masuit.Tools\Masuit.Tools.AspNetCore\Masuit.Tools.AspNetCore.csproj" />
+        <ProjectReference Include="..\Masuit.Tools\Masuit.Tools.Excel\Masuit.Tools.Excel.csproj" />
     </ItemGroup>
 
     <ItemGroup>

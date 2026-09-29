@@ -1,0 +1,559 @@
+﻿using SkiaSharp;
+
+namespace Masuit.Tools.Media;
+
+/// <summary>
+/// 图像hash计算器
+/// </summary>
+public class ImageHasher
+{
+    // 预计算 DCT 余弦系数表，size=32：table[u,x] = cos((pi/32) * (x+0.5) * u)
+    // 避免每次 ComputeDct 调用时执行 32*32=1024 次 Math.Cos
+    private static readonly double[,] DctCosTable32 = BuildDctCosTable(32);
+    private static readonly double Dct32Scale = Math.Sqrt(2.0 / 32);
+    private static readonly double DctCu32Zero = 1.0 / Math.Sqrt(2.0);
+
+    private static double[,] BuildDctCosTable(int n)
+    {
+        var table = new double[n, n];
+        for (int u = 0; u < n; u++)
+        for (int x = 0; x < n; x++)
+            table[u, x] = Math.Cos((Math.PI / n) * (x + 0.5) * u);
+        return table;
+    }
+
+    private readonly IImageTransformer _transformer;
+
+    public ImageHasher()
+    {
+        _transformer = new SkiaSharpTransformer();
+    }
+
+    /// <summary>
+    /// 使用给定的IImageTransformer初始化实例
+    /// </summary>
+    /// <param name="transformer">用于图像变换的IImageTransformer的实现类</param>
+    public ImageHasher(IImageTransformer transformer)
+    {
+        _transformer = transformer;
+    }
+
+    /// <summary>
+    /// 使用平均值算法计算图像的64位哈希
+    /// </summary>
+    /// <param name="pathToImage">图片的文件路径</param>
+    /// <returns>64位hash值</returns>
+    public ulong AverageHash64(string pathToImage)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(pathToImage, 160);
+        return AverageHash64(image);
+    }
+
+    /// <summary>
+    /// 使用平均值算法计算图像的64位哈希
+    /// </summary>
+    /// <param name="sourceStream">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong AverageHash64(Stream sourceStream)
+    {
+        var pixels = _transformer.TransformImage(sourceStream, 8, 8);
+        var average = pixels.Sum(b => b) / 64;
+
+        // 遍历所有像素，如果超过平均值，则将其设置为1，如果低于平均值，则将其设置为0。
+        var hash = 0UL;
+        for (var i = 0; i < 64; i++)
+        {
+            if (pixels[i] > average) hash |= 1UL << i;
+        }
+
+        return hash;
+    }
+    /// <summary>
+    /// 使用平均值算法计算图像的64位哈希
+    /// </summary>
+    /// <param name="image">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong AverageHash64(SKBitmap image)
+    {
+        var pixels = _transformer.TransformImage(image, 8, 8);
+        var average = pixels.Sum(b => b) / 64;
+
+        // 遍历所有像素，如果超过平均值，则将其设置为1，如果低于平均值，则将其设置为0。
+        var hash = 0UL;
+        for (var i = 0; i < 64; i++)
+        {
+            if (pixels[i] > average) hash |= 1UL << i;
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的64位哈希
+    /// 将图像转换为8x8灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="pathToImage">图片的文件路径</param>
+    /// <returns>64位hash值</returns>
+    public ulong MedianHash64(string pathToImage)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(pathToImage, 160);
+        return MedianHash64(image);
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的64位哈希
+    /// 将图像转换为8x8灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="sourceStream">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong MedianHash64(Stream sourceStream)
+    {
+        var pixels = _transformer.TransformImage(sourceStream, 8, 8);
+        var sorted = new byte[64];
+        Array.Copy(pixels, sorted, 64);
+        Array.Sort(sorted);
+        var median = (byte) ((sorted[31] + sorted[32]) / 2);
+        var hash = 0UL;
+        for (var i = 0; i < 64; i++)
+        {
+            if (pixels[i] > median)
+            {
+                hash |= 1UL << i;
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的64位哈希
+    /// 将图像转换为8x8灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="image">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong MedianHash64(SKBitmap image)
+    {
+        var pixels = _transformer.TransformImage(image, 8, 8);
+        var sorted = new byte[64];
+        Array.Copy(pixels, sorted, 64);
+        Array.Sort(sorted);
+        var median = (byte) ((sorted[31] + sorted[32]) / 2);
+        var hash = 0UL;
+        for (var i = 0; i < 64; i++)
+        {
+            if (pixels[i] > median) hash |= 1UL << i;
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的256位哈希
+    /// 将图像转换为16x16的灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="pathToImage">图片的文件路径</param>
+    /// <returns>256位hash值，生成一个4长度的数组返回</returns>
+    public ulong[] MedianHash256(string pathToImage)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(pathToImage, 160);
+        return MedianHash256(image);
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的256位哈希
+    /// 将图像转换为16x16的灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="sourceStream">读取到的图片流</param>
+    /// <returns>256位hash值，生成一个4长度的数组返回</returns>
+    public ulong[] MedianHash256(Stream sourceStream)
+    {
+        var pixels = _transformer.TransformImage(sourceStream, 16, 16);
+        var sorted = new byte[256];
+        Array.Copy(pixels, sorted, 256);
+        Array.Sort(sorted);
+        var median = (byte) ((sorted[127] + sorted[128]) / 2);
+        var hash64 = 0UL;
+        var hash = new ulong[4];
+        for (var i = 0; i < 4; i++)
+        {
+            for (var j = 0; j < 64; j++)
+            {
+                if (pixels[64 * i + j] > median)
+                {
+                    hash64 |= 1UL << j;
+                }
+            }
+
+            hash[i] = hash64;
+            hash64 = 0UL;
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用中值算法计算给定图像的256位哈希
+    /// 将图像转换为16x16的灰度图像，从中查找中值像素值，然后在结果哈希中将值大于中值的所有像素标记为1。与基于平均值的实现相比，更能抵抗非线性图像编辑。
+    /// </summary>
+    /// <param name="image">读取到的图片流</param>
+    /// <returns>256位hash值，生成一个4长度的数组返回</returns>
+    public ulong[] MedianHash256(SKBitmap image)
+    {
+        var pixels = _transformer.TransformImage(image, 16, 16);
+        var sorted = new byte[256];
+        Array.Copy(pixels, sorted, 256);
+        Array.Sort(sorted);
+        var median = (byte) ((sorted[127] + sorted[128]) / 2);
+        var hash64 = 0UL;
+        var hash = new ulong[4];
+        for (var i = 0; i < 4; i++)
+        {
+            for (var j = 0; j < 64; j++)
+            {
+                if (pixels[64 * i + j] > median)
+                {
+                    hash64 |= 1UL << j;
+                }
+            }
+
+            hash[i] = hash64;
+            hash64 = 0UL;
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的64位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="pathToImage">图片的文件路径</param>
+    /// <returns>64位hash值</returns>
+    public ulong DifferenceHash64(string pathToImage)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(pathToImage, 160);
+        return DifferenceHash64(image);
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的64位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="sourceStream">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong DifferenceHash64(Stream sourceStream)
+    {
+        var pixels = _transformer.TransformImage(sourceStream, 9, 8);
+
+        // 遍历像素，如果左侧像素比右侧像素亮，则将哈希设置为1。
+        var hash = 0UL;
+        var hashPos = 0;
+        for (var i = 0; i < 8; i++)
+        {
+            var rowStart = i * 9;
+            for (var j = 0; j < 8; j++)
+            {
+                if (pixels[rowStart + j] > pixels[rowStart + j + 1])
+                {
+                    hash |= 1UL << hashPos;
+                }
+
+                hashPos++;
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的64位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="image">读取到的图片流</param>
+    /// <returns>64位hash值</returns>
+    public ulong DifferenceHash64(SKBitmap image)
+    {
+        var pixels = _transformer.TransformImage(image, 9, 8);
+
+        // 遍历像素，如果左侧像素比右侧像素亮，则将哈希设置为1。
+        var hash = 0UL;
+        var hashPos = 0;
+        for (var i = 0; i < 8; i++)
+        {
+            var rowStart = i * 9;
+            for (var j = 0; j < 8; j++)
+            {
+                if (pixels[rowStart + j] > pixels[rowStart + j + 1])
+                {
+                    hash |= 1UL << hashPos;
+                }
+
+                hashPos++;
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的256位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="pathToImage">图片的文件路径</param>
+    /// <returns>256位hash值</returns>
+    public ulong[] DifferenceHash256(string pathToImage)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(pathToImage, 160);
+        return DifferenceHash256(image);
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的64位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="sourceStream">读取到的图片流</param>
+    /// <returns>256位hash值</returns>
+    public ulong[] DifferenceHash256(Stream sourceStream)
+    {
+        var pixels = _transformer.TransformImage(sourceStream, 17, 16);
+
+        // 遍历像素，如果左侧像素比右侧像素亮，则将哈希设置为1。
+        var hash = new ulong[4];
+        var hashPos = 0;
+        var hashPart = 0;
+        for (var i = 0; i < 16; i++)
+        {
+            var rowStart = i * 17;
+            for (var j = 0; j < 16; j++)
+            {
+                if (pixels[rowStart + j] > pixels[rowStart + j + 1])
+                {
+                    hash[hashPart] |= 1UL << hashPos;
+                }
+
+                if (hashPos == 63)
+                {
+                    hashPos = 0;
+                    hashPart++;
+                }
+                else
+                {
+                    hashPos++;
+                }
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用差分哈希算法计算图像的64位哈希。
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="image">读取到的图片流</param>
+    /// <returns>256位hash值</returns>
+    public ulong[] DifferenceHash256(SKBitmap image)
+    {
+        var pixels = _transformer.TransformImage(image, 17, 16);
+
+        // 遍历像素，如果左侧像素比右侧像素亮，则将哈希设置为1。
+        var hash = new ulong[4];
+        var hashPos = 0;
+        var hashPart = 0;
+        for (var i = 0; i < 16; i++)
+        {
+            var rowStart = i * 17;
+            for (var j = 0; j < 16; j++)
+            {
+                if (pixels[rowStart + j] > pixels[rowStart + j + 1])
+                {
+                    hash[hashPart] |= 1UL << hashPos;
+                }
+
+                if (hashPos == 63)
+                {
+                    hashPos = 0;
+                    hashPart++;
+                }
+                else
+                {
+                    hashPos++;
+                }
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用32分辨率精度DCT算法计算图像的64位哈希
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="path">图片路径</param>
+    /// <returns>64位hash值</returns>
+    public ulong DctHash(string path)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(path, 160);
+        return DctHash(image);
+    }
+
+    /// <summary>
+    /// 使用32分辨率精度DCT算法计算图像的64位哈希
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="image">读取到的图片</param>
+    /// <returns>64位hash值</returns>
+    public ulong DctHash(SKBitmap image)
+    {
+        var grayscalePixels = _transformer.GetPixelData(image, 32, 32);
+        var dctMatrix = ComputeDct(grayscalePixels, 32);
+
+        // 内联 ExtractTopLeftBlock + CalculateMedian + GenerateHash，消除中间分配
+        var flatBlock = new double[64];
+        for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+            flatBlock[y * 8 + x] = dctMatrix[y, x];
+
+        // 对副本排序求中值，保留原数组用于哈希生成
+        var sorted = new double[64];
+        Array.Copy(flatBlock, sorted, 64);
+        Array.Sort(sorted);
+        double median = (sorted[31] + sorted[32]) / 2.0;
+
+        ulong hash = 0UL;
+        for (int i = 0; i < 64; i++)
+            if (flatBlock[i] >= median)
+                hash |= 1UL << i;
+        return hash;
+    }
+
+    /// <summary>
+    /// 使用64分辨率精度DCT算法计算图像的64位哈希
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="path">图片路径</param>
+    /// <returns>64位hash值</returns>
+    public ulong DctHash64(string path)
+    {
+        using var image = SkiaImageHelper.DecodeGrayThumb(path, 160);
+        return DctHash64(image);
+    }
+
+    /// <summary>
+    /// 使用64分辨率精度DCT算法计算图像的64位哈希
+    /// </summary>
+    /// <see cref="https://segmentfault.com/a/1190000038308093"/>
+    /// <param name="image">读取到的图片</param>
+    /// <returns>64位hash值</returns>
+    public ulong DctHash64(SKBitmap image)
+    {
+        return DctHasher.Compute(image);
+    }
+
+    /// <summary>
+    /// 计算图像的DCT矩阵
+    /// </summary>
+    /// <param name="input"></param>
+    /// <param name="size"></param>
+    /// <returns></returns>
+    private double[,] ComputeDct(byte[,] input, int size)
+    {
+        // 复用预计算余弦表，从 size*size*64 次 Math.Cos + 64 数组分配
+        // 降低到只分配 2 个 double[size,size]
+        var rowDCT = new double[size, size];
+        var output = new double[size, size];
+        double scale = Dct32Scale;
+        double cu0 = DctCu32Zero;
+
+        // 对每行做 1D DCT
+        for (int y = 0; y < size; y++)
+        {
+            for (int u = 0; u < size; u++)
+            {
+                double sum = 0.0;
+                for (int x = 0; x < size; x++)
+                {
+                    sum += input[y, x] * DctCosTable32[u, x];
+                }
+
+                rowDCT[y, u] = ((u == 0) ? cu0 : 1.0) * sum * scale;
+            }
+        }
+
+        // 对每列做 1D DCT
+        for (int x = 0; x < size; x++)
+        {
+            for (int y = 0; y < size; y++)
+            {
+                double sum = 0.0;
+                for (int t = 0; t < size; t++)
+                {
+                    sum += rowDCT[t, x] * DctCosTable32[y, t];
+                }
+
+                output[y, x] = ((y == 0) ? cu0 : 1.0) * sum * scale;
+            }
+        }
+
+        return output;
+    }
+
+    /// <summary>
+    /// 使用汉明距离比较两幅图像的哈希值。结果1表示图像完全相同，而结果0表示图像完全不同。
+    /// </summary>
+    /// <param name="hash1">图像1的hash</param>
+    /// <param name="hash2">图像2的hash</param>
+    /// <returns>相似度范围：[0,1]</returns>
+    public static float Compare(ulong hash1, ulong hash2)
+    {
+        var hashDifference = hash1 ^ hash2;
+        var hamming = HammingWeight(hashDifference);
+        return 1.0f - hamming / 64.0f;
+    }
+
+    /// <summary>
+    /// 使用汉明距离比较两幅图像的哈希值。结果1表示图像完全相同，而结果0表示图像完全不同。
+    /// </summary>
+    /// <param name="hash1">图像1的hash</param>
+    /// <param name="hash2">图像2的hash</param>
+    /// <returns>相似度范围：[0,1]</returns>
+    public static float Compare(ulong[] hash1, ulong[] hash2)
+    {
+        if (hash1.Length != hash2.Length)
+        {
+            throw new ArgumentException("hash1 与 hash2长度不匹配");
+        }
+
+        var hashSize = hash1.Length;
+        ulong onesInHash = 0;
+
+        // hash异或运算
+        var hashDifference = new ulong[hashSize];
+        for (var i = 0; i < hashSize; i++)
+        {
+            hashDifference[i] = hash1[i] ^ hash2[i];
+        }
+
+        // 逐个计算汉明距离
+        for (var i = 0; i < hashSize; i++)
+        {
+            onesInHash += HammingWeight(hashDifference[i]);
+        }
+
+        return 1.0f - onesInHash / (hashSize * 64.0f);
+    }
+
+    private static ulong HammingWeight(ulong hash)
+    {
+        hash -= (hash >> 1) & M1;
+        hash = (hash & M2) + ((hash >> 2) & M2);
+        hash = (hash + (hash >> 4)) & M4;
+        return (hash * H01) >> 56;
+    }
+
+    // 汉明距离常量. http://en.wikipedia.org/wiki/Hamming_weight
+    private const ulong M1 = 0x5555555555555555;
+    private const ulong M2 = 0x3333333333333333;
+    private const ulong M4 = 0x0f0f0f0f0f0f0f0f;
+    private const ulong H01 = 0x0101010101010101;
+}

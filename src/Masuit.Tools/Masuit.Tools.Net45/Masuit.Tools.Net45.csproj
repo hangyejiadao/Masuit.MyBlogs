@@ -1,0 +1,339 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net45</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Authors>懒得勤快</Authors>
+        <Description>
+            全龄段友好的C#万能工具库，码数吐司库，不管你是菜鸟新手还是骨灰级玩家都能轻松上手，Masuit.Tools(适用于.NET Framework 4.5-4.6.2的项目)，包含一些常用的操作类，大都是静态类，加密解密，反射操作，Excel简单导出，权重随机筛选算法，分布式短id，表达式树，linq扩展，文件压缩，多线程下载和FTP客户端，硬件信息，字符串扩展方法，日期时间扩展操作，中国农历，大文件拷贝，图像裁剪，验证码，断点续传，集合扩展等常用封装。
+            官网教程：https://masuit.tools
+            github：https://github.com/ldqk/Masuit.Tools
+        </Description>
+        <Copyright>懒得勤快，长空X</Copyright>
+        <RepositoryUrl>https://github.com/ldqk/Masuit.Tools</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/ldqk/Masuit.Tools</PackageProjectUrl>
+        <PackageTags>Masuit.Tools,工具库,Utility,Crypt,Extensions</PackageTags>
+        <PackageReleaseNotes>Masuit.Tools基础公共库，如有问题请联系作者QQ:3444764617，或者到项目的github反馈问题，详细的API文档在github上:https://github.com/ldqk/Masuit.Tools</PackageReleaseNotes>
+        <Product>Masuit.Tools.Net</Product>
+        <PackageId>Masuit.Tools.Net45</PackageId>
+        <RepositoryType></RepositoryType>
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+        <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+        <FileVersion>2.5.9</FileVersion>
+        <Company>masuit.org</Company>
+        <AssemblyVersion>2.5.9</AssemblyVersion>
+        <PackageLicenseUrl>https://github.com/ldqk/Masuit.Tools/blob/master/LICENSE</PackageLicenseUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+        <Title>Masuit.Tools</Title>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <SonarQubeExclude>True</SonarQubeExclude>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Castle.Core" Version="[4.4.1]" />
+        <PackageReference Include="DnsClient" Version="[1.7.0]" />
+        <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.3.0" />
+        <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="System.ValueTuple" version="[4.5.0]" />
+        <Reference Include="System.ComponentModel.DataAnnotations" />
+        <Reference Include="System.Web" />
+    </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Masuit.Tools.Abstractions\Database\DataTableBuilder.cs">
+      <Link>Database\DataTableBuilder.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Database\DataTableHelper.cs">
+      <Link>Database\DataTableHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\DateTimeExt\ChineseCalendar.cs">
+      <Link>DateTimeExt\ChineseCalendar.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\DateTimeExt\DateInfoStruct.cs">
+      <Link>DateTimeExt\DateInfoStruct.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\DateTimeExt\DateTimeHelper.cs">
+      <Link>DateTimeExt\DateTimeHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\DateTimeExt\WeekHolidayStruct.cs">
+      <Link>DateTimeExt\WeekHolidayStruct.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Extensions\*\*.*">
+      <Link>Extensions\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Extensions\Dynamics\*\*.*">
+      <Link>Extensions\Dynamics\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Files\IniFile\*.*">
+      <Link>Files\IniFile\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Files\FileExt.cs">
+      <Link>Files\FileExt.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Files\TextEncodingDetector.cs">
+      <Link>Files\TextEncodingDetector.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Linq\LinqExtension.cs">
+      <Link>Linq\LinqExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Logging\LogInfo.cs">
+      <Link>Logging\LogInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Logging\LogLevel.cs">
+      <Link>Logging\LogLevel.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Logging\LogManager.cs">
+      <Link>Logging\LogManager.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Maths\Point2D.cs">
+      <Link>Maths\Point2D.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Maths\RadarChart.cs">
+      <Link>Maths\RadarChart.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Maths\RadarChartEngine.cs">
+      <Link>Maths\RadarChartEngine.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Maths\Vector2D.cs">
+      <Link>Maths\Vector2D.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Media\ImageFormat.cs">
+      <Link>Media\ImageFormat.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Media\ThumbnailCutMode.cs">
+      <Link>Media\ThumbnailCutMode.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Media\WatermarkPosition.cs">
+      <Link>Media\WatermarkPosition.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Mime\ContentType.cs">
+      <Link>Mime\ContentType.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Mime\DefaultMimeItems.cs">
+      <Link>Mime\DefaultMimeItems.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Mime\IMimeMapper.cs">
+      <Link>Mime\IMimeMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Mime\MimeMapper.cs">
+      <Link>Mime\MimeMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Mime\MimeMappingItem.cs">
+      <Link>Mime\MimeMappingItem.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\Circle.cs">
+      <Link>Models\Circle.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\DateTimeRange.cs">
+      <Link>Models\DateTimeRange.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\Email.cs">
+      <Link>Models\Email.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\EmailAddress.cs">
+      <Link>Models\EmailAddress.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\ITree.cs">
+      <Link>Models\ITree.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\PagedList.cs">
+      <Link>Models\PagedList.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\Sphere.cs">
+      <Link>Models\Sphere.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\Tree.cs">
+      <Link>Models\Tree.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Models\TreeExtensions.cs">
+      <Link>Models\TreeExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Net\MultiThreadDownloader.cs">
+      <Link>Net\MultiThreadDownloader.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Net\PartialDownloader.cs">
+      <Link>Net\PartialDownloader.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\Extensions.cs">
+      <Link>RandomSelector\Extensions.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\MultipleSelector.cs">
+      <Link>RandomSelector\MultipleSelector.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\SelectorBase.cs">
+      <Link>RandomSelector\SelectorBase.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\SelectorOptions.cs">
+      <Link>RandomSelector\SelectorOptions.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\SingleSelector.cs">
+      <Link>RandomSelector\SingleSelector.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\WeightedItem.cs">
+      <Link>RandomSelector\WeightedItem.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\RandomSelector\WeightedSelector.cs">
+      <Link>RandomSelector\WeightedSelector.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Reflection\*.*">
+      <Link>Reflection\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Security\*.*">
+      <Link>Security\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Compile>
+    <Compile Remove="Properties\**" />
+    <EmbeddedResource Remove="Properties\**" />
+    <None Remove="Properties\**" />
+    <Compile Include="..\Masuit.Tools.Abstractions\Strings\NumberFormater.cs">
+      <Link>Strings\NumberFormater.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Strings\SimHash.cs">
+      <Link>Strings\SimHash.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Strings\Template.cs">
+      <Link>Strings\Template.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Strings\UnicodeFormater.cs">
+      <Link>Strings\UnicodeFormater.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\CompositeContractResolver.cs">
+      <Link>Systems\CompositeContractResolver.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\ConcurrentHashSet.cs">
+      <Link>Systems\ConcurrentHashSet.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\ConcurrentLimitedQueue.cs">
+      <Link>Systems\ConcurrentLimitedQueue.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\DeserializeOnlyContractResolver.cs">
+      <Link>Systems\DeserializeOnlyContractResolver.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\DeserializeOnlyJsonPropertyAttribute.cs">
+      <Link>Systems\DeserializeOnlyJsonPropertyAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\Disposable.cs">
+      <Link>Systems\Disposable.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\DisposableConcurrentDictionary.cs">
+      <Link>Systems\DisposableConcurrentDictionary.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\DisposableDictionary.cs">
+      <Link>Systems\DisposableDictionary.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\EnumExt.cs">
+      <Link>Systems\EnumExt.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\FallbackJsonProperty.cs">
+      <Link>Systems\FallbackJsonProperty.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\FallbackJsonPropertyResolver.cs">
+      <Link>Systems\FallbackJsonPropertyResolver.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\HighAccurateTimer.cs">
+      <Link>Systems\HighAccurateTimer.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\HiPerfTimer.cs">
+      <Link>Systems\HiPerfTimer.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\LargeMemoryStream.cs">
+      <Link>Systems\LargeMemoryStream.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\LimitedQueue.cs">
+      <Link>Systems\LimitedQueue.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\LookupX.cs">
+      <Link>Systems\LookupX.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\MaskConverter.cs">
+      <Link>Systems\MaskConverter.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\MaskEmailConverter.cs">
+      <Link>Systems\MaskEmailConverter.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\NullableConcurrentDictionary.cs">
+      <Link>Systems\NullableConcurrentDictionary.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\NullableDictionary.cs">
+      <Link>Systems\NullableDictionary.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\NullObject.cs">
+      <Link>Systems\NullObject.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\PooledMemoryStream.cs">
+      <Link>Systems\PooledMemoryStream.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\SerializeIgnoreAttribute.cs">
+      <Link>Systems\SerializeIgnoreAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Systems\StopwatchHelper.cs">
+      <Link>Systems\StopwatchHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\ComplexPassword.cs">
+      <Link>Validator\ComplexPassword.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\IsEmailAttribute.cs">
+      <Link>Validator\IsEmailAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\IsIPAddressAttribute.cs">
+      <Link>Validator\IsIPAddressAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\IsPhoneAttribute.cs">
+      <Link>Validator\IsPhoneAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\MaxValueAttribute.cs">
+      <Link>Validator\MaxValueAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\MinValueAttribute.cs">
+      <Link>Validator\MinValueAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Validator\UnifiedSocialCreditCodeAttribute.cs">
+      <Link>Validator\UnifiedSocialCreditCodeAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools.Abstractions\Win32\WindowsCommand.cs">
+      <Link>Win32\WindowsCommand.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeActionResultBase.cs">
+      <Link>Mvc\ActionResults\ResumeActionResultBase.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeFileContentResult.cs">
+      <Link>Mvc\ActionResults\ResumeFileContentResult.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeFilePathResult.cs">
+      <Link>Mvc\ActionResults\ResumeFilePathResult.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeFileResult.cs">
+      <Link>Mvc\ActionResults\ResumeFileResult.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeFileStreamResult.cs">
+      <Link>Mvc\ActionResults\ResumeFileStreamResult.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ActionResults\ResumeRequest.cs">
+      <Link>Mvc\ActionResults\ResumeRequest.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\ControllerExtension.cs">
+      <Link>Mvc\ControllerExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\HttpHeaders.cs">
+      <Link>Mvc\HttpHeaders.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Mvc\Internal\ByteRange.cs">
+      <Link>Mvc\Internal\ByteRange.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Net\CacheHelper.cs">
+      <Link>Net\CacheHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Masuit.Tools\Net\CookieHelper.cs">
+      <Link>Net\CookieHelper.cs</Link>
+    </Compile>
+  </ItemGroup>
+    <ItemGroup>
+        <None Include="..\README.md">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
+</Project>

@@ -42,9 +42,20 @@ RUN dotnet publish Masuit.MyBlogs.Core/Masuit.MyBlogs.Core.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# curl is handy for container health-checks / manual debugging.
+# Runtime dependencies of the app:
+#   libfontconfig1, libfreetype6 - required by SkiaSharp's libSkiaSharp.so
+#   fonts-dejavu-core            - without real system fonts
+#                                  SKFontManager.FontFamilies is empty and the
+#                                  captcha has no typeface to render with
+#   p7zip-full                   - external 7z binary used by the archive tools
+#   curl                         - container health-checks / manual debugging
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        libfontconfig1 \
+        libfreetype6 \
+        fonts-dejavu-core \
+        p7zip-full \
     && rm -rf /var/lib/apt/lists/*
 
 # The application listens on these ports (see appsettings.json).

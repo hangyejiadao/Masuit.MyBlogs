@@ -55,6 +55,11 @@
       <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
     <PackageReference Include="SharpCompress" Version="0.50.4" />
     <PackageReference Include="SkiaSharp" Version="4.152.1" />
+    <!-- SkiaSharp alone ships no Linux native assets, so libSkiaSharp.so is
+         absent on Linux and every Skia call fails with DllNotFoundException
+         (for example the captcha drawn by PassportController.ValidateCode).
+         This package needs libfontconfig1/libfreetype6 at runtime. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.152.1" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="IndexRange" Version="1.1.1" />

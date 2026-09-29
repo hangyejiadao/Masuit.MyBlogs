@@ -93,7 +93,9 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ${{ needs.build.outputs.image }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/masuit-myblogs' }}
+          # Empty when the variable is unset; the script then falls back to
+          # "$HOME/masuit-myblogs" (works for unprivileged users like 'ubuntu').
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
           REPO_URL: https://github.com/${{ github.repository }}.git
           BRANCH: ${{ github.ref_name }}
         with:
@@ -105,9 +107,23 @@ jobs:
           script_stop: true
           script: |
             set -e
-            : "${DEPLOY_PATH:=/opt/masuit-myblogs}"
+            : "${DEPLOY_PATH:=$HOME/masuit-myblogs}"
             COMPOSE_DIR="$DEPLOY_PATH/deploy"
             echo "Deploying $IMAGE to $COMPOSE_DIR"
+
+            # Docker access: use the daemon directly when the user is in the
+            # 'docker' group, otherwise fall back to passwordless sudo.
+            if docker info >/dev/null 2>&1; then
+              SUDO=""
+            elif sudo -n docker info >/dev/null 2>&1; then
+              SUDO="sudo"
+            else
+              echo "ERROR: no access to the Docker daemon." >&2
+              echo "Fix on the server: sudo usermod -aG docker \$USER   (then reconnect SSH)," >&2
+              echo "or grant passwordless sudo to the deploy user." >&2
+              exit 1
+            fi
+            echo "Docker access: ${SUDO:-(direct)}"
 
             # Sync the repository (compose files + default config templates).
             # Host-owned runtime files are untracked and therefore preserved.
@@ -142,27 +158,27 @@ jobs:
               echo "IMAGE=$IMAGE" >> .env
             fi
 
-            docker compose pull web
-            docker compose up -d --remove-orphans
+            $SUDO docker compose pull web
+            $SUDO docker compose up -d --remove-orphans
 
             # Remove dangling images left over from previous releases.
-            docker image prune -f
+            $SUDO docker image prune -f
 
             echo "Waiting for the container to become healthy..."
             for i in $(seq 1 30); do
-              status=$(docker inspect --format '{{.State.Health.Status}}' masuit-myblogs 2>/dev/null || echo starting)
+              status=$($SUDO docker inspect --format '{{.State.Health.Status}}' masuit-myblogs 2>/dev/null || echo starting)
               echo "  [$i/30] health=$status"
               if [ "$status" = "healthy" ]; then
                 break
               fi
               if [ "$status" = "unhealthy" ]; then
                 echo "Container is unhealthy. Recent logs:"
-                docker compose logs --tail=80 web
+                $SUDO docker compose logs --tail=80 web
                 echo "Hint: check $COMPOSE_DIR/appsettings.json (Database:ConnString must use host 'postgres', Redis must use host 'redis')."
                 exit 1
               fi
               sleep 5
             done
 
-            docker compose ps
+            $SUDO docker compose ps
             echo "Deployment finished."

@@ -21,10 +21,11 @@ flowchart LR
     G --> H[健康检查]
 ```
 
-服务器上目录结构（默认 `/opt/masuit-myblogs`）：
+服务器上目录结构（默认 `/home/<部署用户>/masuit-myblogs`，可在 GitHub 变量 `DEPLOY_PATH` 中改为
+`/opt/masuit-myblogs` 等绝对路径；下文以 `$DEPLOY_PATH` 代称）：
 
 ```
-/opt/masuit-myblogs/
+$DEPLOY_PATH/
 ├── deploy/
 │   ├── docker-compose.yml      # 由 git 同步
 │   ├── .env.example            # 由 git 同步
@@ -42,21 +43,29 @@ flowchart LR
 
 ## 2. 服务器准备（一次性）
 
-以 Ubuntu 22.04/24.04 为例，使用 `root` 或具有 docker 权限的用户：
+服务器为 Ubuntu，登录用户为 `ubuntu`（见本地 `~/.ssh/config`）。在服务器上执行：
 
 ```bash
-# 1) 安装 Docker（含 compose 插件）
-curl -fsSL https://get.docker.com | sh
+# 1) 安装 Docker（官方脚本已包含 compose 插件）
+curl -fsSL https://get.docker.com | sudo sh
 
-# 2) 创建部署目录
-mkdir -p /opt/masuit-myblogs
+# 2) 把部署用户加入 docker 组（否则流水线无法操作 Docker）
+sudo usermod -aG docker ubuntu
 
-# 3) 开放端口（如使用云服务器安全组，也需在控制台放行）
-#    应用默认监听 5000
+# 3) 使组权限立即生效（重连 SSH，或执行：）
+newgrp docker
+
+# 4) 验证
+docker run --rm hello-world
 ```
 
+> 若不想用 docker 组，也可给该用户配置免密 sudo，流水线会自动回退到
+> `sudo docker ...`（见 `deploy.yml` 中的 `Docker access` 探测）。
+>
 > **推荐**：用 Nginx/Caddy 反向代理到 `127.0.0.1:5000` 并处理 TLS，
 > 此时请在 `appsettings.json` 中设置 `"Https": { "Enabled": false }`。
+
+> 确保云厂商安全组放行 **22**（SSH）与 **5000**（应用）端口。
 
 ---
 
@@ -64,34 +73,54 @@ mkdir -p /opt/masuit-myblogs
 
 ### 3.1 生成部署用 SSH 密钥
 
-在**本地**执行（不要上传私钥到仓库）：
+在**本地**执行（私钥只上传到 GitHub Secrets，绝不入库）：
 
-```bash
-# 生成密钥（不要设置空口令以外的交互；执行后 ./deploy_key 是私钥）
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ./deploy_key
+```powershell
+# 生成一对 ed25519 密钥
+ssh-keygen -t ed25519 -C "github-actions-masuit-myblogs" -f "$env:USERPROFILE\.ssh\myblogs_deploy"
 ```
 
-- 把 `deploy_key.pub` 内容追加到服务器的 `~/.ssh/authorized_keys`
-- `deploy_key`（私钥）内容用于下面的 `SERVER_SSH_KEY` 密钥
+- **公钥** `~/.ssh/myblogs_deploy.pub` → 追加到服务器的 `~/.ssh/authorized_keys`
+- **私钥** `~/.ssh/myblogs_deploy`（无扩展名）→ 填入 GitHub 的 `SERVER_SSH_KEY`
+
+把公钥安装到服务器（在**本地** PowerShell 执行，最后一步会提示输入一次服务器密码）：
+
+```powershell
+# 1) 上传公钥
+scp "$env:USERPROFILE\.ssh\myblogs_deploy.pub" ubuntu@49.51.199.210:/tmp/deploy.pub
+
+# 2) 追加到 authorized_keys（会提示输入服务器密码）
+ssh ubuntu@49.51.199.210 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat /tmp/deploy.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && rm /tmp/deploy.pub && echo INSTALLED"
+
+# 3) 验证免密登录（应输出 CONN_OK，且不再提示密码）
+ssh -o BatchMode=yes ubuntu@49.51.199.210 "echo CONN_OK"
+```
 
 ### 3.2 添加 Repository Secrets
 
-`Settings → Secrets and variables → Actions → New repository secret`：
+打开 `Settings → Secrets and variables → Actions → New repository secret`，逐个添加：
 
-| Secret | 必填 | 说明 |
+| Secret | 必填 | 值 |
 |---|---|---|
 | `SERVER_HOST` | ✅ | `49.51.199.210` |
-| `SERVER_USER` | ✅ | 登录用户名，如 `root` |
-| `SERVER_SSH_KEY` | ✅ | 上一步生成的**私钥**全文 |
-| `SERVER_PORT` | ❌ | SSH 端口，默认 `22` |
+| `SERVER_USER` | ✅ | `ubuntu` |
+| `SERVER_SSH_KEY` | ✅ | 本地私钥 `~/.ssh/myblogs_deploy` 的**全部内容**（含 `-----BEGIN/END OPENSSH PRIVATE KEY-----` 两行） |
+| `SERVER_PORT` | ❌ | 不填则默认 `22` |
+
+获取私钥全文并可一键复制到剪贴板：
+
+```powershell
+Get-Content "$env:USERPROFILE\.ssh\myblogs_deploy" -Raw | Set-Clipboard
+# 然后在 GitHub 页面直接 Ctrl+V 粘贴
+```
 
 ### 3.3 （可选）添加 Repository Variable
 
-`Settings → Secrets and variables → Actions → Variables`：
+`Settings → Secrets and variables → Actions → Variables`（注意是 Variables，不是 Secrets）：
 
 | Variable | 默认值 | 说明 |
 |---|---|---|
-| `DEPLOY_PATH` | `/opt/masuit-myblogs` | 服务器上的部署目录 |
+| `DEPLOY_PATH` | `$HOME/masuit-myblogs` | 服务器上的部署目录，即 `/home/ubuntu/masuit-myblogs`。填 `/opt/masuit-myblogs` 亦可，但需保证该用户有写权限 |
 
 ---
 
@@ -105,7 +134,7 @@ ssh-keygen -t ed25519 -C "github-actions-deploy" -f ./deploy_key
 3. **此时容器大概率启动失败**，因为默认配置还不能用。登录服务器修改配置：
 
 ```bash
-cd /opt/masuit-myblogs/deploy
+cd ~/masuit-myblogs/deploy         # DEPLOY_PATH 为默认值时
 
 # 修改 .env：设置数据库密码
 vi .env                      # 修改 POSTGRES_PASSWORD
@@ -131,11 +160,11 @@ docker compose logs -f web
 首次部署是空库，需要还原数据。仓库中提供了备份：
 
 ```bash
-cd /opt/masuit-myblogs/deploy
+cd ~/masuit-myblogs/deploy
 
 # 1) 解压备份（仓库里的 database/postgres/myblogs.7z）
 #    可用 7z 解压得到 myblogs.sql
-7z x /opt/masuit-myblogs/database/postgres/myblogs.7z -o/tmp
+7z x ~/masuit-myblogs/database/postgres/myblogs.7z -o/tmp
 
 # 2) 还原到容器内的 postgres
 docker compose exec -T postgres psql -U postgres -d myblogs < /tmp/myblogs.sql
@@ -156,7 +185,7 @@ SQL
 
 | 操作 | 命令 |
 |---|---|
-| 查看状态 | `cd /opt/masuit-myblogs/deploy && docker compose ps` |
+| 查看状态 | `cd ~/masuit-myblogs/deploy && docker compose ps` |
 | 查看日志 | `docker compose logs -f --tail=100 web` |
 | 重启 | `docker compose restart web` |
 | 更新到最新镜像 | `docker compose pull web && docker compose up -d` |

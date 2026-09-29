@@ -42,8 +42,10 @@ jobs:
       contents: read
       packages: write
     outputs:
-      # GHCR requires an all-lowercase image name.
-      image: ${{ env.REGISTRY }}/${{ steps.name.outputs.lower }}:${{ github.sha }}
+      # GHCR requires an all-lowercase image name. The `sha-` prefix must match
+      # the tag produced by docker/metadata-action's `type=sha,format=long`
+      # below; otherwise the deploy job asks for a tag that was never pushed.
+      image: ${{ env.REGISTRY }}/${{ steps.name.outputs.lower }}:sha-${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,7 +106,13 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           envs: IMAGE,DEPLOY_PATH,REPO_URL,BRANCH
-          script_stop: true
+          # Do NOT enable script_stop here: drone-ssh implements it by splitting
+          # the script into one line per command and appending an exit-code guard
+          # after every line. That guard also runs after an `if <test>; then` line,
+          # where $? is the test's own status, so a false test (e.g. the first-run
+          # "no .git yet" check) aborts the deploy immediately with exit code 1.
+          # The script already starts with `set -e`, which gives correct
+          # stop-on-error semantics for multi-line if/else and for/do blocks.
           script: |
             set -e
             : "${DEPLOY_PATH:=$HOME/masuit-myblogs}"

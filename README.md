@@ -194,6 +194,8 @@ EF 批量扩展：Z.EntityFramework.Plus 提供高性能批处理；
 #### 3.还原数据库脚本
 创建数据库，名称随意，如：myblogs，然后前往[Release](https://github.com/ldqk/Masuit.MyBlogs/releases)或仓库目录 [`database/postgres`](database/postgres) 下载最新的 PostgreSQL 脚本/备份文件，执行 `psql -U postgres -d myblogs -f xxx.sql` 还原。   
 如需迁移到其他数据库，可先还原到 PostgreSQL，再使用 [Full Convert](https://masuit.org/2163) 或自定义脚本迁移到目标数据库类型。
+
+数据库结构变更和 EF Core 迁移流程见 [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md)。
 #### 4.修改配置文件：
 主要需要配置的是以下内容，其他配置均为可选项，不配置则表示不启用；
 ![image](https://user-images.githubusercontent.com/20254980/169738528-ba0cc1a4-cb19-4e9d-b6cd-2f146a633c35.png)  

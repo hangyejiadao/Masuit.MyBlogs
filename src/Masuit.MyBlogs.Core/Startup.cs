@@ -79,8 +79,12 @@ public class Startup
             });
         });
         services.AddEFSecondLevelCache(options => options.UseCustomCacheProvider<EFCoreCacheProvider>(CacheExpirationMode.Absolute, TimeSpan.FromMinutes(15)).SkipCacheInvalidationCommands(s => Regex.IsMatch(s, "ViewCount|DisplayCount|LinkLoopback|LoginRecord|ClickRecord|VisitRecord|SearchDetails")).UseCacheKeyPrefix("EFCache:"));
-        services.AddDbContext<DataContext>((serviceProvider, opt) => opt.UseNpgsql(AppConfig.ConnString, builder => builder.EnableRetryOnFailure(10)).EnableSensitiveDataLogging().AddInterceptors(serviceProvider.GetRequiredService<SecondLevelCacheInterceptor>())); //配置数据库
-        services.AddDbContext<LoggerDbContext>(opt => opt.UseNpgsql(AppConfig.ConnString)); //配置数据库
+        services.AddDbContext<DataContext>((serviceProvider, opt) => opt.UseNpgsql(AppConfig.ConnString, builder =>
+        {
+            builder.EnableRetryOnFailure(10);
+            builder.MigrationsHistoryTable(DatabaseMigrationExtensions.MainHistoryTable);
+        }).EnableSensitiveDataLogging().AddInterceptors(serviceProvider.GetRequiredService<SecondLevelCacheInterceptor>())); //配置数据库
+        services.AddDbContext<LoggerDbContext>(opt => opt.UseNpgsql(AppConfig.ConnString, builder => builder.MigrationsHistoryTable(DatabaseMigrationExtensions.LoggerHistoryTable))); //配置数据库
         services.ConfigureOptions();
         services.AddHttpsRedirection(options =>
         {
@@ -141,8 +145,8 @@ public class Startup
     /// <param name="loggerdb"></param>
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IHangfireBackJob hangfire, LuceneIndexerOptions luceneIndexerOptions, DataContext maindb, LoggerDbContext loggerdb)
     {
-        maindb.Database.EnsureCreated();
-        loggerdb.Database.EnsureCreated();
+        maindb.MigrateWithLegacyBaseline(DatabaseMigrationExtensions.MainHistoryTable, "SystemSetting", "Post");
+        loggerdb.MigrateWithLegacyBaseline(DatabaseMigrationExtensions.LoggerHistoryTable, "RequestLogDetail", "PerformanceCounter");
         app.InitSettings();
         app.UseRedisSession();
         app.UseDisposeScope();

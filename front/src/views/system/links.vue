@@ -8,11 +8,12 @@
     <div class="col">
       <q-btn-group>
         <q-btn color="primary" icon="refresh" label="刷新" @click="loadLinks" :loading="loading" />
+        <q-btn color="negative" icon="delete" label="删除所选" :disable="selectedLinks.length === 0" :loading="batchDeleting" @click="showBatchDeleteDialog = true" />
         <q-btn color="positive" icon="add" label="添加链接" @click="showAddDialog" />
       </q-btn-group>
     </div>
     <div class="col-4 text-right">
-      <q-input autofocus v-model="searchTerm" dense outlined placeholder="搜索名称、链接地址" debounce="100">
+      <q-input autofocus v-model="searchTerm" dense outlined placeholder="搜索名称、链接地址" debounce="100" @update:model-value="clearSelectedLinks">
         <template #prepend>
           <q-icon name="search" class="cursor-pointer" />
         </template>
@@ -32,7 +33,8 @@
         <div class="text-body2 q-mt-sm">点击上方"添加链接"按钮添加第一个友情链接</div>
       </div>
       <!-- 友情链接表格 -->
-      <vxe-table v-else ref="tableRef" :data="paginatedLinks" stripe border show-header-overflow show-overflow :loading="loading" :edit-config="{ trigger: 'manual', mode: 'row' }">
+      <vxe-table v-else ref="tableRef" :data="paginatedLinks" stripe border show-header-overflow show-overflow :loading="loading" :edit-config="{ trigger: 'manual', mode: 'row' }" @checkbox-change="updateSelectedLinks" @checkbox-all="updateSelectedLinks">
+        <vxe-column type="checkbox" width="50" fixed="left" />
         <!-- 名称列 -->
         <vxe-column field="Name" title="名称" width="150" sortable :edit-render="{}">
           <template #default="{ row }">
@@ -138,6 +140,21 @@
       </div>
     </q-card-section>
   </q-card>
+  <q-dialog v-model="showBatchDeleteDialog" persistent>
+    <q-card>
+      <q-card-section class="row items-center">
+        <q-icon name="warning" color="red" size="2rem" class="q-mr-sm" />
+        <div>
+          <div class="text-h6">确认批量删除</div>
+          <div class="text-subtitle2">确定删除选中的 {{ selectedLinks.length }} 个友情链接吗？此操作不可撤销。</div>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="确认删除" color="negative" :loading="batchDeleting" @click="deleteSelectedLinks" />
+        <q-btn flat label="取消" color="primary" :disable="batchDeleting" v-close-popup />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </div>
 </template>
 <script setup lang="ts">
@@ -168,6 +185,9 @@ interface ApiResponse {
 // 响应式数据
 const links = ref<LinkItem[]>([])
 const loading = ref(false)
+const selectedLinks = ref<LinkItem[]>([])
+const batchDeleting = ref(false)
+const showBatchDeleteDialog = ref(false)
 
 // 分页相关数据
 const currentPage = ref(1)
@@ -197,11 +217,22 @@ const paginatedLinks = computed(() => {
 // 分页方法
 const onPageChange = (page: number) => {
   currentPage.value = page
+  clearSelectedLinks()
+}
+
+const clearSelectedLinks = () => {
+  selectedLinks.value = []
+  tableRef.value?.clearCheckboxRow()
+}
+
+const updateSelectedLinks = () => {
+  selectedLinks.value = tableRef.value?.getCheckboxRecords() || []
 }
 
 // 加载友情链接列表
 const loadLinks = async () => {
   loading.value = true
+  clearSelectedLinks()
   try {
     const response = await api.get('/links/get') as ApiResponse
     if (response?.Success && response.Data) {
@@ -273,6 +304,31 @@ const deleteLink = async (row: LinkItem) => {
     loadLinks()
   } else {
     toast.error(response?.Message || '删除失败', { autoClose: 2000, position: 'top-center' })
+  }
+}
+
+const deleteSelectedLinks = async () => {
+  const ids = selectedLinks.value.map(link => link.Id).filter(id => id > 0)
+  if (ids.length === 0) {
+    toast.warning('请先选择要删除的友情链接', { autoClose: 2000, position: 'top-center' })
+    return
+  }
+
+  batchDeleting.value = true
+  try {
+    const response = await api.post('/links/deletebatch', ids) as ApiResponse
+    if (response?.Success) {
+      toast.success(response.Message || `已删除 ${ids.length} 个友情链接`, { autoClose: 2000, position: 'top-center' })
+      showBatchDeleteDialog.value = false
+      await loadLinks()
+    } else {
+      toast.error(response?.Message || '批量删除失败', { autoClose: 2000, position: 'top-center' })
+    }
+  } catch (error) {
+    toast.error('批量删除失败', { autoClose: 2000, position: 'top-center' })
+    console.error('Error removing selected links:', error)
+  } finally {
+    batchDeleting.value = false
   }
 }
 

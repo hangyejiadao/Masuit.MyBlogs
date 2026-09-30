@@ -151,6 +151,24 @@ public sealed class LinksController : BaseController
     }
 
     /// <summary>
+    /// 批量删除友链
+    /// </summary>
+    /// <param name="ids">友链ID列表</param>
+    /// <returns></returns>
+    [MyAuthorize, HttpPost]
+    public async Task<ActionResult> DeleteBatch([FromBody] int[] ids)
+    {
+        if (ids is not { Length: > 0 } || ids.Any(id => id <= 0))
+        {
+            return ResultData(null, false, "请选择有效的友情链接");
+        }
+
+        ids = ids.Distinct().ToArray();
+        var count = await LinksService.GetQuery(link => ids.Contains(link.Id)).ExecuteDeleteAsync();
+            return ResultData(null, count > 0, count > 0 ? $"已删除 {count} 个友情链接" : "删除失败");
+    }
+
+    /// <summary>
     /// 所有的友情链接
     /// </summary>
     /// <returns></returns>

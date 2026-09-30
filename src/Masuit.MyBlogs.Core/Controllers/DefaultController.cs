@@ -22,6 +22,12 @@ public sealed class DefaultController(IRedisClient redis) : Controller
         return Ok();
     }
 
+    [HttpGet("/forge"), AllowAccessFirewall]
+    public ActionResult GetClientIp()
+    {
+        return Ok(new { ip = HttpContext.Connection.RemoteIpAddress?.ToString() });
+    }
+
     /// <summary>
     /// 文章统计
     /// </summary>

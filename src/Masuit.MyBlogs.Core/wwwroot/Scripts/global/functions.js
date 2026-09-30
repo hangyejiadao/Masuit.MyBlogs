@@ -295,6 +295,8 @@ async function enableSafemode() {
   location.reload();
 }
 
+window.enableDefaultSafeMode = enableSafemode;
+
 /*默认安全模式*/
 document.addEventListener('DOMContentLoaded', function () {
   const { createDiscreteApi } = naive;

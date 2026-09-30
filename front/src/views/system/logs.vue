@@ -26,6 +26,18 @@
           </q-td>
         </template>
 
+        <template #body-cell-exception="props">
+          <q-td :props="props" class="exception-cell">
+            <span v-if="props.row.ExceptionInfo" class="exception-preview">
+              {{ props.row.ExceptionInfo }}
+              <q-tooltip max-width="600px" class="exception-tooltip">
+                {{ props.row.ExceptionInfo }}
+              </q-tooltip>
+            </span>
+            <span v-else class="text-grey-6">-</span>
+          </q-td>
+        </template>
+
         <template #body-cell-actions="props">
           <q-td :props="props">
             <q-btn flat dense color="primary" label="详情" @click="selectedLog = props.row; showDetails = true" />
@@ -125,6 +137,7 @@ const columns = [
   { name: 'method', label: '方式', field: 'Method', align: 'left' as const },
   { name: 'path', label: '请求路径', field: 'Path', align: 'left' as const },
   { name: 'result', label: '结果', field: 'StatusCode', align: 'center' as const },
+  { name: 'exception', label: '异常详情', field: 'ExceptionInfo', align: 'left' as const },
   { name: 'duration', label: '耗时', field: 'DurationMilliseconds', align: 'right' as const, format: (value: number) => `${value} ms` },
   { name: 'actions', label: '详情', field: 'Id', align: 'center' as const }
 ]
@@ -206,6 +219,24 @@ onMounted(() => {
 
 .system-logs-page :deep(.q-table thead th) {
   font-weight: 600;
+}
+
+.exception-cell {
+  min-width: 320px;
+  max-width: 560px;
+}
+
+.exception-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.exception-tooltip {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .detail-content {

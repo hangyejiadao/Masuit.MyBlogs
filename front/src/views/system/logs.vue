@@ -201,7 +201,7 @@ onMounted(() => {
 
 .system-logs-page :deep(.q-table thead th),
 .system-logs-page :deep(.q-table tbody td) {
-  font-size: 14px;
+  font-size: 30px;
 }
 
 .system-logs-page :deep(.q-table thead th) {
@@ -211,7 +211,7 @@ onMounted(() => {
 .detail-content {
   max-height: calc(100vh - 70px);
   overflow: auto;
-  font-size: 15px;
+  font-size: 30px;
 }
 
 .detail-grid {
@@ -229,7 +229,7 @@ pre {
   max-height: 32vh;
   overflow: auto;
   padding: 12px;
-  font-size: 14px;
+  font-size: 30px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: #f5f5f5;

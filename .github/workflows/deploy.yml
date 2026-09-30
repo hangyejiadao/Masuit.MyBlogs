@@ -154,15 +154,6 @@ jobs:
             # Only the app image is swapped: the compose file pins a local tag, and
             # db / redis / volumes / nginx keep running exactly as they are.
             $SUDO docker tag "$IMAGE" "$LOCAL_IMAGE"
-
-            STATIC_CONTAINER=$($SUDO docker create "$LOCAL_IMAGE")
-            trap '$SUDO docker rm -f "$STATIC_CONTAINER" >/dev/null 2>&1 || true' EXIT
-            $SUDO mkdir -p "$DEPLOY_PATH/appwwwroot/Assets/banner" "$DEPLOY_PATH/appwwwroot/Scripts/global"
-            $SUDO docker cp "$STATIC_CONTAINER:/app/wwwroot/Assets/banner/carousel.js" "$DEPLOY_PATH/appwwwroot/Assets/banner/carousel.js"
-            $SUDO docker cp "$STATIC_CONTAINER:/app/wwwroot/Scripts/global/functions.js" "$DEPLOY_PATH/appwwwroot/Scripts/global/functions.js"
-            $SUDO docker rm "$STATIC_CONTAINER"
-            trap - EXIT
-
             $SUDO docker compose up -d --no-build app
 
             # The image has no HEALTHCHECK, so poll the published port instead.

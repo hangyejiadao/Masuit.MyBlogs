@@ -1,7 +1,5 @@
 ﻿(function () {
     const carousel = document.querySelector('.carousel');
-    if (!carousel) return;
-
     const slides = Array.from(carousel.querySelectorAll('.slide'));
     const prevBtn = carousel.querySelector('.nav.prev');
     const nextBtn = carousel.querySelector('.nav.next');

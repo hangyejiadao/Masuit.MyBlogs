@@ -38,7 +38,7 @@ public sealed class DashboardController(IWebHostEnvironment env) : AdminControll
     /// 获取站内消息
     /// </summary>
     /// <returns></returns>
-    public async Task<ActionResult> GetMessages([FromServices] IPostService postService, [FromServices] ILeaveMessageService leaveMessageService, [FromServices] ICommentService commentService, CancellationToken cancellationToken)
+    public async Task GetMessages([FromServices] IPostService postService, [FromServices] ILeaveMessageService leaveMessageService, [FromServices] ICommentService commentService, CancellationToken cancellationToken)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers.Append("X-Accel-Buffering", "no");
@@ -88,7 +88,6 @@ public sealed class DashboardController(IWebHostEnvironment env) : AdminControll
             }
         }
 
-        return Ok();
     }
 
     /// <summary>

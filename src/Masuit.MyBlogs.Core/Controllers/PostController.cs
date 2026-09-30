@@ -523,39 +523,40 @@ public sealed class PostController : BaseController
     /// </summary>
     /// <returns></returns>
     [Route("{id:int}/online")]
-    public async Task<ActionResult> Online(int id, CancellationToken cancellationToken)
+    public async Task Online(int id, CancellationToken cancellationToken)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers.Append("X-Accel-Buffering", "no");
         Response.Headers.Append("Cache-Control", "no-cache");
         var key = $"PostOnline:{id}";
         await RedisHelper.SAddAsync(key, ClientIP.ToString());
-        await RedisHelper.ExpireAsync(key, TimeSpan.FromMinutes(60));
-        while (true)
+        try
         {
-            try
+            await RedisHelper.ExpireAsync(key, TimeSpan.FromMinutes(60));
+            while (true)
             {
-                if (HttpContext.RequestAborted.IsCancellationRequested)
+                try
                 {
-                    await RedisHelper.SRemAsync(key, ClientIP.ToString());
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    var online = await RedisHelper.SCardAsync(key);
+                    await Response.WriteAsync("data:" + online + "\r\r", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                    await Task.Delay(5000, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
                     break;
                 }
-
-                var online = await RedisHelper.SCardAsync(key);
-                await Response.WriteAsync("data:" + online + "\r\r", cancellationToken: HttpContext.RequestAborted);
-                await Response.Body.FlushAsync(HttpContext.RequestAborted);
-                await Task.Delay(5000, HttpContext.RequestAborted);
-            }
-            catch (OperationCanceledException)
-            {
-                await RedisHelper.SRemAsync(key, ClientIP.ToString());
-                break;
             }
         }
-
-        await RedisHelper.SRemAsync(key, ClientIP.ToString());
-
-        return Ok();
+        finally
+        {
+            await RedisHelper.SRemAsync(key, ClientIP.ToString());
+        }
     }
 
     /// <summary>
@@ -1150,7 +1151,7 @@ public sealed class PostController : BaseController
     /// </summary>
     /// <returns></returns>
     [MyAuthorize]
-    public async Task<IActionResult> Statistic(CancellationToken cancellationToken = default)
+    public async Task Statistic(CancellationToken cancellationToken = default)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers.Append("X-Accel-Buffering", "no");
@@ -1215,8 +1216,6 @@ public sealed class PostController : BaseController
             }
         }
 
-        Response.Body.Close();
-        return new EmptyResult();
     }
 
     /// <summary>

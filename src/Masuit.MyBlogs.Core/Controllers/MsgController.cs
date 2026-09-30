@@ -363,7 +363,7 @@ public sealed class MsgController : BaseController
     /// </summary>
     /// <returns></returns>
     [MyAuthorize]
-    public async Task<ActionResult> GetUnreadMsgs(CancellationToken cancellationToken)
+    public async Task GetUnreadMsgs(CancellationToken cancellationToken)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers.Append("X-Accel-Buffering", "no");
@@ -389,7 +389,6 @@ public sealed class MsgController : BaseController
             }
         }
 
-        return Ok();
     }
 
     /// <summary>

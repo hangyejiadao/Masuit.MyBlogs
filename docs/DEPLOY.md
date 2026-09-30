@@ -3,8 +3,9 @@
 本项目通过 **GitHub Actions + Docker + SSH** 自动部署到服务器
 `49.51.199.210`。每次推送到 `master` 分支涉及 `src/**` 的改动，都会自动构建镜像并发布。
 
-> 前端管理后台单独手动发布。宿主机的 `appwwwroot` 整目录挂载到容器，
-> 因此前端构建产物和上传文件均以该目录中的内容为准，不会随应用镜像更新覆盖。
+> 前端管理后台由独立的 GitHub Actions 工作流构建，并只发布到服务器
+> `/opt/myblogs/appwwwroot/dashboard`；宿主机的 `appwwwroot` 整目录挂载到容器，
+> 上传文件及其他静态资源不会被前端发布覆盖。
 
 ---
 
@@ -33,7 +34,7 @@ $DEPLOY_PATH/
 │   ├── appsettings.json        # 首次自动生成，需自行修改（不纳入 git）
 │   ├── App_Data/               # 首次自动生成（IP库/词库/证书，不纳入 git）
 │   ├── data/                   # PostgreSQL + Redis 数据（自动创建）
-│   ├── logs/  lucene/  appwwwroot/       # 运行时数据和手动发布的静态文件
+│   ├── logs/  lucene/  appwwwroot/       # 运行时数据和静态文件
 ```
 
 `docker-compose.yml` 会启动 3 个容器：`web`（本项目）、`postgres`、`redis`。
@@ -243,11 +244,11 @@ GHCR 包默认私有。若服务器拉取镜像失败，二选一：
 `Actions → Deploy Backend → Run workflow`。
 
 **Q: 前端改动会触发部署吗？**
-不会。前端需在本地执行 `cd front && npm run build`。构建完成后，将
-`src/Masuit.MyBlogs.Core/wwwroot/dashboard` 的内容复制到服务器
-`/opt/myblogs/appwwwroot/dashboard`。只更新 `dashboard`，不要覆盖整个
-`appwwwroot`，这样会保留 `upload` 和其他由站点使用的静态资源。
+会。推送 `front/**` 改动到 `master` 后，`Deploy Dashboard` 工作流会构建前端，
+并只同步 `dashboard` 子目录到 `/opt/myblogs/appwwwroot/dashboard`。
+也可在 GitHub Actions 页面手动运行 `Deploy Dashboard`。发布过程不会覆盖
+`upload` 或 `appwwwroot` 中的其他文件。
 
 **Q: 镜像更新后前端仍显示旧版怎么办？**
-`appwwwroot` 是整目录宿主机挂载，容器镜像内的静态文件会被它遮挡。
-需手动发布前端构建产物到 `/opt/myblogs/appwwwroot/dashboard`。
+应用镜像不负责发布前端。请检查 `Deploy Dashboard` 工作流是否成功；该工作流
+直接更新宿主机挂载目录中的 `dashboard`，无需重启应用容器。

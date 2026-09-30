@@ -10,7 +10,7 @@
 # Required configuration lives on the host, NOT inside this file:
 #   ./appsettings.json        -> database / redis / https settings
 #   ./App_Data/               -> IP databases, word lists, optional TLS cert
-#   ./logs/ ./lucene/ ./wwwroot-upload/  -> created automatically
+#   ./logs/ ./lucene/ ./appwwwroot/      -> created automatically
 # ---------------------------------------------------------------------------
 services:
   web:
@@ -30,7 +30,8 @@ services:
       # Runtime data that must survive container recreation.
       - ./logs:/app/logs
       - ./lucene:/app/lucene
-      - ./wwwroot-upload:/app/wwwroot/upload
+      # Persist and manually publish static files and uploads on the host.
+      - ./appwwwroot:/app/wwwroot
     depends_on:
       postgres:
         condition: service_healthy

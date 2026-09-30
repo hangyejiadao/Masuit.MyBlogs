@@ -27,9 +27,6 @@ COPY src/Masuit.Tools/Directory.Build.props Masuit.Tools/Directory.Build.props
 RUN dotnet restore Masuit.MyBlogs.Core/Masuit.MyBlogs.Core.csproj
 
 # 2) Copy the full sources and publish.
-#    The admin SPA (wwwroot/dashboard) is already committed to the repo, so the
-#    frontend build is not required here. See docs/DEPLOY.md if you prefer to
-#    build the frontend inside the image instead.
 COPY src/ ./
 RUN dotnet publish Masuit.MyBlogs.Core/Masuit.MyBlogs.Core.csproj \
         -c Release \

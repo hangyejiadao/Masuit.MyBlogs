@@ -1,10 +1,10 @@
 # 后端自动化部署指南
 
-本项目的后端（`src/Masuit.MyBlogs.Core`）通过 **GitHub Actions + Docker + SSH** 自动部署到服务器
+本项目通过 **GitHub Actions + Docker + SSH** 自动部署到服务器
 `49.51.199.210`。每次推送到 `master` 分支涉及 `src/**` 的改动，都会自动构建镜像并发布。
 
-> 本指南只覆盖**后端**。前端管理后台（`front/`）的构建产物
-> `src/Masuit.MyBlogs.Core/wwwroot/dashboard` 已提交进仓库，无需在流水线中构建。
+> 前端管理后台单独手动发布。宿主机的 `appwwwroot` 整目录挂载到容器，
+> 因此前端构建产物和上传文件均以该目录中的内容为准，不会随应用镜像更新覆盖。
 
 ---
 
@@ -33,7 +33,7 @@ $DEPLOY_PATH/
 │   ├── appsettings.json        # 首次自动生成，需自行修改（不纳入 git）
 │   ├── App_Data/               # 首次自动生成（IP库/词库/证书，不纳入 git）
 │   ├── data/                   # PostgreSQL + Redis 数据（自动创建）
-│   ├── logs/  lucene/  wwwroot-upload/   # 运行时数据（自动创建）
+│   ├── logs/  lucene/  appwwwroot/       # 运行时数据和手动发布的静态文件
 ```
 
 `docker-compose.yml` 会启动 3 个容器：`web`（本项目）、`postgres`、`redis`。
@@ -206,11 +206,11 @@ SQL
 | `deploy/data/redis` | `/data` | Redis AOF |
 | `deploy/logs` | `/app/logs` | 应用日志 |
 | `deploy/lucene` | `/app/lucene` | Lucene 搜索索引 |
-| `deploy/wwwroot-upload` | `/app/wwwroot/upload` | 用户上传文件 |
+| `deploy/appwwwroot` | `/app/wwwroot` | 静态资源、前端后台和用户上传文件 |
 | `deploy/App_Data` | `/app/App_Data` | IP 库、词库、证书 |
 | `deploy/appsettings.json` | `/app/appsettings.json` | 配置（只读挂载） |
 
-建议定期备份 `deploy/data/`、`deploy/wwwroot-upload/`、`deploy/appsettings.json`。
+建议定期备份 `deploy/data/`、`deploy/appwwwroot/`、`deploy/appsettings.json`。
 
 ---
 
@@ -242,5 +242,12 @@ GHCR 包默认私有。若服务器拉取镜像失败，二选一：
 **Q: 如何手动触发一次部署？**
 `Actions → Deploy Backend → Run workflow`。
 
-**Q: 只想部署后端，前端改动会触发吗？**
-不会。流水线仅监听 `src/**`、`Dockerfile`、`deploy/**` 等路径的变更。
+**Q: 前端改动会触发部署吗？**
+不会。前端需在本地执行 `cd front && npm run build`。构建完成后，将
+`src/Masuit.MyBlogs.Core/wwwroot/dashboard` 的内容复制到服务器
+`/opt/myblogs/appwwwroot/dashboard`。只更新 `dashboard`，不要覆盖整个
+`appwwwroot`，这样会保留 `upload` 和其他由站点使用的静态资源。
+
+**Q: 镜像更新后前端仍显示旧版怎么办？**
+`appwwwroot` 是整目录宿主机挂载，容器镜像内的静态文件会被它遮挡。
+需手动发布前端构建产物到 `/opt/myblogs/appwwwroot/dashboard`。

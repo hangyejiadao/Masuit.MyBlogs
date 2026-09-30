@@ -13,7 +13,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Masuit.Tools.AspNetCore", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Masuit.Tools.Abstractions", "Masuit.Tools\Masuit.Tools.Abstractions\Masuit.Tools.Abstractions.csproj", "{0661EDB7-12E8-4F8B-AD0B-1CDEF7D03FAD}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "工具库", "工具库", "{51B677E0-194F-4A0F-9E86-4B147F22728E}"EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "工具库", "工具库", "{51B677E0-194F-4A0F-9E86-4B147F22728E}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Masuit.Tools.Excel", "Masuit.Tools\Masuit.Tools.Excel\Masuit.Tools.Excel.csproj", "{99933B01-597A-40F7-81D7-8BDA3CD4D840}"
 EndProject
 Global

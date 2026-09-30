@@ -46,8 +46,8 @@ public sealed class SystemController : AdminController
 
         var totalCount = await query.CountAsync();
         var items = await query
-            .OrderByDescending(log => log.IsException)
-            .ThenByDescending(log => log.Time)
+            .OrderByDescending(log => log.Time)
+         
             .Skip((page - 1) * size)
             .Take(size)
             .Select(log => new

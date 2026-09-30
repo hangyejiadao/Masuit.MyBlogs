@@ -27,34 +27,39 @@ public sealed class DefaultController(IRedisClient redis) : Controller
     /// </summary>
     /// <returns></returns>
     [Route("/ping")]
-    public async Task<IActionResult> Ping(CancellationToken cancellationToken = default)
+    public async Task Ping(CancellationToken cancellationToken = default)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers.Append("X-Accel-Buffering", "no");
         Response.Headers.Append("Cache-Control", "no-cache");
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         await redis.SAddAsync("GlobalOnline", ip);
-        while (true)
+        try
         {
-            try
+            while (true)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
 
-                await Response.WriteAsync("event: message\n", cancellationToken);
-                await Response.WriteAsync("data:" + DateTime.UtcNow.GetTotalMilliseconds() + "\r\r", cancellationToken: cancellationToken);
-                await Response.Body.FlushAsync(cancellationToken);
-                await Task.Delay(2000, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
+                try
+                {
+                    await Response.WriteAsync("event: message\n", cancellationToken);
+                    await Response.WriteAsync("data:" + DateTime.UtcNow.GetTotalMilliseconds() + "\r\r", cancellationToken: cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                    await Task.Delay(2000, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
-        await redis.SRemAsync("GlobalOnline", ip);
-        return Ok();
+        finally
+        {
+            await redis.SRemAsync("GlobalOnline", ip);
+        }
     }
 }
 

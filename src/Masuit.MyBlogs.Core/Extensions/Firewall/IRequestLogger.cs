@@ -92,6 +92,7 @@ public class RequestDatabaseLogger : IRequestLogger
 
         var start = DateTime.Now.AddMonths(-6);
         _dataContext.Set<RequestLogDetail>().Where(e => e.Time < start).ExecuteDelete();
+        _dataContext.Set<HttpRequestLog>().Where(e => e.Time < start).ExecuteDelete();
         _dataContext.SaveChanges();
     }
 }

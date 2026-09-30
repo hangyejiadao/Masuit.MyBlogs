@@ -25,7 +25,7 @@ import '@quasar/extras/material-icons/material-icons.css'
 import '@quasar/extras/material-icons-outlined/material-icons-outlined.css'
 import '@quasar/extras/material-icons-round/material-icons-round.css'
 import '@quasar/extras/material-icons-sharp/material-icons-sharp.css'
-import '@quasar/extras/fontawesome-v6/fontawesome-v6.css'
+import '@quasar/extras/fontawesome-v7/fontawesome-v7.css'
 import zhCN from 'quasar/lang/zh-CN'
 
 /**

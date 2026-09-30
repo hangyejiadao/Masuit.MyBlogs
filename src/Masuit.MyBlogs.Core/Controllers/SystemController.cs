@@ -32,6 +32,45 @@ public sealed class SystemController : AdminController
 
     public IFirewallService FirewallService { get; set; }
 
+    public async Task<ActionResult> GetHttpRequestLogs(
+        [FromServices] LoggerDbContext loggerDbContext,
+        [Range(1, int.MaxValue)] int page = 1,
+        [Range(1, 100)] int size = 50,
+        bool errorsOnly = false)
+    {
+        var query = loggerDbContext.Set<HttpRequestLog>().AsNoTracking();
+        if (errorsOnly)
+        {
+            query = query.Where(log => log.IsException);
+        }
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(log => log.IsException)
+            .ThenByDescending(log => log.Time)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .Select(log => new
+            {
+                log.Id,
+                log.Time,
+                log.Method,
+                log.Path,
+                log.RequestParameters,
+                log.ResponseResult,
+                log.StatusCode,
+                log.ExceptionInfo,
+                log.IsException,
+                log.IP,
+                log.UserAgent,
+                log.TraceId,
+                log.DurationMilliseconds
+            })
+            .ToListAsync();
+
+        return ResultData(new { Items = items, TotalCount = totalCount, Page = page, Size = size });
+    }
+
     public ActionResult GetServers()
     {
         var servers = PerfCounter.CreateDataSource().Select(c => c.ServerIP).Distinct().ToArray();

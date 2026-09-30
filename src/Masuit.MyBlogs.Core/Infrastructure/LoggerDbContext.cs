@@ -11,6 +11,8 @@ public sealed class LoggerDbContext(DbContextOptions<LoggerDbContext> options) :
     {
         modelBuilder.Entity<RequestLogDetail>().HasKey(e => new { e.Id, e.Time });
         modelBuilder.Entity<PerformanceCounter>().HasKey(e => new { e.ServerIP, e.Time });
+        modelBuilder.Entity<HttpRequestLog>().HasKey(e => e.Id);
+        modelBuilder.Entity<HttpRequestLog>().HasIndex(e => new { e.IsException, e.Time });
     }
 }
 

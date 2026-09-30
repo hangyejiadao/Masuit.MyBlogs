@@ -56,6 +56,7 @@ public sealed class ErrorController : Controller
         var feature = HttpContext.Features.Get<IExceptionHandlerPathFeature>();
         if (feature != null)
         {
+            HttpContext.Items[HttpRequestLoggingMiddleware.ExceptionInfoItemKey] = feature.Error.ToString();
             string err;
             var ip = HttpContext.Connection.RemoteIpAddress;
             switch (feature.Error)

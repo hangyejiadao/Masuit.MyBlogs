@@ -160,6 +160,7 @@ public class Startup
         {
             app.UseExceptionHandler("/ServiceUnavailable");
         }
+        app.UseMiddleware<HttpRequestLoggingMiddleware>();
         app.UseBundles();
         app.SetupHttpsRedirection(Configuration);
         app.UseDefaultFiles().UseStaticFiles();

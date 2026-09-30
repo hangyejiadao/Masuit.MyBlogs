@@ -292,3 +292,6 @@ deploy/data/
 deploy/logs/
 deploy/lucene/
 deploy/wwwroot-upload/
+
+# Generated dashboard assets are built from front/ and deployed separately.
+/src/Masuit.MyBlogs.Core/wwwroot/dashboard/

@@ -26,7 +26,7 @@ public sealed class HttpRequestLoggingMiddleware(RequestDelegate next, IServiceS
             var request = context.Request;
             state = new RequestLogState(
                 Stopwatch.GetTimestamp(),
-                DateTime.UtcNow,
+                DateTime.Now,
                 request.Method,
                 request.Path.Value ?? "/",
                 await GetRequestParametersAsync(request),

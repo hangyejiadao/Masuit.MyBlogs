@@ -68,7 +68,24 @@ public sealed class SystemController : AdminController
             })
             .ToListAsync();
 
-        return ResultData(new { Items = items, TotalCount = totalCount, Page = page, Size = size });
+        var formattedItems = items.Select(log => new
+        {
+            log.Id,
+            Time = log.Time.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
+            log.Method,
+            log.Path,
+            log.RequestParameters,
+            log.ResponseResult,
+            log.StatusCode,
+            log.ExceptionInfo,
+            log.IsException,
+            log.IP,
+            log.UserAgent,
+            log.TraceId,
+            log.DurationMilliseconds
+        });
+
+        return ResultData(new { Items = formattedItems, TotalCount = totalCount, Page = page, Size = size });
     }
 
     public ActionResult GetServers()

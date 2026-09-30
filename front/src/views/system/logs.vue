@@ -125,15 +125,20 @@ interface TablePagination {
   descending: boolean
   page: number
   rowsPerPage: number
-  rowsNumber: number
+  rowsNumber?: number
 }
 
 interface TableRequest {
   pagination: TablePagination
 }
 
+const formatTime = (value: string) => {
+  const match = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/.exec(value)
+  return match ? `${match[1]} ${match[2]}` : value || '-'
+}
+
 const columns = [
-  { name: 'time', label: '时间', field: 'Time', align: 'left' as const },
+  { name: 'time', label: '时间', field: 'Time', align: 'left' as const, format: formatTime },
   { name: 'method', label: '方式', field: 'Method', align: 'left' as const },
   { name: 'path', label: '请求路径', field: 'Path', align: 'left' as const },
   { name: 'result', label: '结果', field: 'StatusCode', align: 'center' as const },
@@ -186,8 +191,6 @@ const loadLogs = async (requestedPagination: TablePagination) => {
 }
 
 const onRequest = (request: TableRequest) => loadLogs(request.pagination)
-
-const formatTime = (value: string) => new Date(value).toLocaleString()
 
 const prettyJson = (value: string) => {
   try {

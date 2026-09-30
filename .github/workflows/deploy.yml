@@ -10,6 +10,7 @@ name: Deploy Backend
 #   SERVER_USER   - e.g. ubuntu  (needs docker access or passwordless sudo)
 #   SERVER_SSH_KEY - private SSH key that can log in to the server
 #   SERVER_PORT   - optional, defaults to 22
+#   QQ_SMTP_AUTH_CODE - QQ Mail SMTP authorization code for hangyejialin@qq.com
 #
 # Optional repository variables:
 #   DEPLOY_PATH   - compose directory on the server, defaults to /opt/myblogs
@@ -177,3 +178,72 @@ jobs:
 
             $SUDO docker compose ps
             echo "Deployment finished."
+      - name: Send deployment success email
+        if: success()
+        continue-on-error: true
+        env:
+          SMTP_USERNAME: hangyejialin@qq.com
+          SMTP_PASSWORD: ${{ secrets.QQ_SMTP_AUTH_CODE }}
+          SMTP_SERVER: smtp.qq.com
+          SMTP_PORT: "465"
+          SMTP_USE_SSL: "true"
+          MAIL_FROM: hangyejialin@qq.com
+          MAIL_TO: hangyejialin@qq.com
+          DEPLOYED_IMAGE: ${{ needs.build.outputs.image }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          TRIGGERED_BY: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+
+          required = [
+              "SMTP_USERNAME",
+              "SMTP_PASSWORD",
+              "SMTP_SERVER",
+              "SMTP_PORT",
+              "MAIL_FROM",
+              "MAIL_TO",
+          ]
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              raise SystemExit(f"Missing required environment variables: {', '.join(missing)}")
+
+          sha = os.environ["COMMIT_SHA"]
+          body = "\n".join([
+              "Masuit.MyBlogs 后端部署成功。",
+              "",
+              f"仓库：{os.environ['REPOSITORY']}",
+              f"分支：{os.environ['BRANCH']}",
+              f"提交：{sha}",
+              f"触发人：{os.environ['TRIGGERED_BY']}",
+              f"镜像：{os.environ['DEPLOYED_IMAGE']}",
+              f"运行记录：{os.environ['RUN_URL']}",
+          ])
+
+          message = EmailMessage()
+          message["From"] = os.environ["MAIL_FROM"]
+          message["To"] = os.environ["MAIL_TO"]
+          message["Subject"] = f"[部署成功] Masuit.MyBlogs {sha[:7]}"
+          message.set_content(body)
+
+          server = os.environ["SMTP_SERVER"]
+          port = int(os.environ["SMTP_PORT"])
+          username = os.environ["SMTP_USERNAME"]
+          password = os.environ["SMTP_PASSWORD"]
+
+          if os.environ.get("SMTP_USE_SSL", "true").lower() == "true":
+              with smtplib.SMTP_SSL(server, port, context=ssl.create_default_context(), timeout=30) as smtp:
+                  smtp.login(username, password)
+                  smtp.send_message(message)
+          else:
+              with smtplib.SMTP(server, port, timeout=30) as smtp:
+                  smtp.starttls(context=ssl.create_default_context())
+                  smtp.login(username, password)
+                  smtp.send_message(message)
+          PY

@@ -63,6 +63,9 @@
         <PackageReference Include="MiniProfiler.EntityFrameworkCore" Version="4.5.4" />
         <PackageReference Include="PanGu.HighLight" Version="1.0.0" />
         <PackageReference Include="Riok.Mapperly" Version="4.3.1" />
+        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
         <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.4" />
         <PackageReference Include="TimeZoneConverter" Version="7.2.0" />
         <PackageReference Include="WilderMinds.RssSyndication" Version="1.7.1" />

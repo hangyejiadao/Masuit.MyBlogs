@@ -33,7 +33,21 @@ public sealed class FileController : AdminController
     /// <returns></returns>
     public ActionResult GetFiles([FromBodyOrDefault] string path)
     {
-        var files = Directory.GetFiles(HostEnvironment.WebRootPath + path).OrderByDescending(s => s).Select(s => new
+        var webRootPath = Path.GetFullPath(HostEnvironment.WebRootPath);
+        var relativePath = (path ?? string.Empty)
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar)
+            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var directoryPath = Path.GetFullPath(Path.Combine(webRootPath, relativePath));
+        var relativeToRoot = Path.GetRelativePath(webRootPath, directoryPath);
+        if (Path.IsPathRooted(relativeToRoot) ||
+            relativeToRoot == ".." ||
+            relativeToRoot.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException("The requested directory is outside the web root.");
+        }
+
+        var files = Directory.GetFiles(directoryPath).OrderByDescending(s => s).Select(s => new
         {
             filename = Path.GetFileName(s),
             path = s

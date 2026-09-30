@@ -28,6 +28,7 @@
         <div class="col-auto">
           <q-btn-group>
             <q-btn color="primary" icon="refresh" label="刷新" @click="loadPageData" :loading="loading" />
+            <q-btn color="negative" icon="delete" :label="`批量删除${selectedAdvertisements.length ? ` (${selectedAdvertisements.length})` : ''}`" :disable="selectedAdvertisements.length === 0 || loading" @click="showBatchDeleteDialog = true" />
             <q-btn color="positive" icon="add" label="添加广告" @click="showAddDialog" />
           </q-btn-group>
         </div>
@@ -48,7 +49,8 @@
       </div>
       <!-- 广告表格 -->
       <div v-else>
-        <vxe-table ref="tableRef" :data="advertisements" :loading="loading" border stripe :scroll-y="{ enabled: true }" :sort-config="{ remote: true }">
+        <vxe-table ref="tableRef" :data="advertisements" :loading="loading" border stripe :scroll-y="{ enabled: true }" :sort-config="{ remote: true }" @checkbox-change="updateSelectedAdvertisements" @checkbox-all="updateSelectedAdvertisements">
+          <vxe-column type="checkbox" width="50" fixed="left" />
           <vxe-column field="Id" title="ID" width="80" />
           <vxe-column field="Title" title="标题" min-width="300">
             <template #default="{ row }">
@@ -162,6 +164,21 @@
       </div>
     </q-card-section>
   </q-card>
+  <q-dialog v-model="showBatchDeleteDialog">
+    <q-card>
+      <q-card-section class="row items-center">
+        <q-icon name="warning" color="negative" size="2rem" class="q-mr-sm" />
+        <div>
+          <div class="text-h6">确认批量删除</div>
+          <div class="text-subtitle2">确定删除已选择的 {{ selectedAdvertisements.length }} 条广告吗？此操作不可撤销。</div>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="取消" color="primary" v-close-popup />
+        <q-btn flat label="确认删除" color="negative" :loading="batchDeleting" @click="removeSelectedAdvertisements" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
   <!-- 访问趋势图表 -->
   <q-card flat bordered>
     <q-card-section>
@@ -679,8 +696,10 @@ interface Category {
 
 // 响应式数据
 const advertisements = ref<Advertisement[]>([])
+const selectedAdvertisements = ref<Advertisement[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const batchDeleting = ref(false)
 
 // 搜索和排序
 const searchKeyword = ref('')
@@ -714,6 +733,7 @@ const showDelayDialogFlag = ref(false)
 const showUploadDialog = ref(false)
 const showInsightDialogFlag = ref(false)
 const showImagePreview = ref(false)
+const showBatchDeleteDialog = ref(false)
 const isEditing = ref(false)
 
 // 图片预览相关
@@ -799,7 +819,7 @@ const editorToolbar = {
 }
 
 // 表格引用
-const tableRef = ref(null)
+const tableRef = ref<any>(null)
 
 // 图表相关
 const chartContainer = ref<HTMLElement | null>(null)
@@ -878,6 +898,8 @@ const saveShowColumns = () => {
 // 加载分页数据
 const loadPageData = async () => {
   loading.value = true
+  selectedAdvertisements.value = []
+  tableRef.value?.clearCheckboxRow()
   try {
     const params = {
       page: pagination.value.page,
@@ -902,6 +924,10 @@ const loadPageData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const updateSelectedAdvertisements = () => {
+  selectedAdvertisements.value = tableRef.value?.getCheckboxRecords() || []
 }
 
 // 加载分类数据
@@ -1046,6 +1072,36 @@ const removeAdvertisement = async (ad: Advertisement) => {
   } catch (error) {
     toast.error('删除失败', { autoClose: 2000, position: 'top-center' })
     console.error('Error removing advertisement:', error)
+  }
+}
+
+const removeSelectedAdvertisements = async () => {
+  const ids = selectedAdvertisements.value.map(ad => ad.Id).filter((id): id is number => typeof id === 'number')
+  if (ids.length === 0) {
+    toast.warning('请先选择要删除的广告', { autoClose: 2000, position: 'top-center' })
+    return
+  }
+
+  batchDeleting.value = true
+  try {
+    const response = await api.post('/partner/deletebatch', ids) as ApiResponse
+    if (response?.Success !== false) {
+      toast.success(response?.Message || `已删除 ${ids.length} 条广告`, { autoClose: 2000, position: 'top-center' })
+      showBatchDeleteDialog.value = false
+      selectedAdvertisements.value = []
+      tableRef.value?.clearCheckboxRow()
+      if (ids.length === advertisements.value.length && pagination.value.page === Math.ceil(pagination.value.total / pagination.value.itemsPerPage)) {
+        pagination.value.page--
+      }
+      await loadPageData()
+    } else {
+      toast.error(response?.Message || '批量删除失败', { autoClose: 2000, position: 'top-center' })
+    }
+  } catch (error) {
+    toast.error('批量删除失败', { autoClose: 2000, position: 'top-center' })
+    console.error('Error removing selected advertisements:', error)
+  } finally {
+    batchDeleting.value = false
   }
 }
 

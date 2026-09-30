@@ -135,6 +135,24 @@ public sealed class AdvertisementController : BaseController
     }
 
     /// <summary>
+    /// 批量删除广告
+    /// </summary>
+    /// <param name="ids">广告ID列表</param>
+    /// <returns></returns>
+    [HttpPost, MyAuthorize]
+    public async Task<IActionResult> DeleteBatch([FromBody] int[] ids)
+    {
+        if (ids is not { Length: > 0 } || ids.Any(id => id <= 0))
+        {
+            return ResultData(null, false, "请选择有效的广告");
+        }
+
+        ids = ids.Distinct().ToArray();
+        var count = await AdsService.GetQuery(ad => ids.Contains(ad.Id)).ExecuteDeleteAsync();
+        return ResultData(null, count > 0, count > 0 ? $"已删除 {count} 条广告" : "删除失败");
+    }
+
+    /// <summary>
     /// 广告上下架
     /// </summary>
     /// <param name="id">文章id</param>

@@ -167,5 +167,5 @@
 </environment>
 <environment names="Stage,Production">
   @await Styles.RenderAsync("/bundles/article.css")
-  @await Scripts.RenderAsync("/bundles/article.js")
+  <script defer src="@(await Scripts.UrlAsync("/bundles/article.js"))"></script>
 </environment>

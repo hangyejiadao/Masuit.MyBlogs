@@ -5,7 +5,10 @@ using Masuit.Tools.AspNetCore.ResumeFileResults.Extensions;
 using Masuit.Tools.Html;
 using Masuit.Tools.Logging;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Masuit.Tools.Mime;
 using Configuration = AngleSharp.Configuration;
 using Mammoth;
@@ -76,8 +79,11 @@ public sealed class UploadController : Controller
     private async Task<string> SaveAsHtml(IFormFile file)
     {
         await using var ms = file.OpenReadStream();
+        using var repairedDocx = Path.GetExtension(file.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase)
+            ? RepairMissingNumberingLevels(ms)
+            : null;
         var converter = new DocumentConverter();
-        var html = converter.ConvertToHtml(ms).Value;
+        var html = converter.ConvertToHtml(repairedDocx ?? ms).Value;
         var context = BrowsingContext.New(Configuration.Default);
         var doc = context.OpenAsync(req => req.Content(html)).Result;
         var body = doc.Body;
@@ -100,6 +106,66 @@ public sealed class UploadController : Controller
         }
 
         return body.InnerHtml.HtmlSanitizerCustom(attributes: ["dir", "lang"]);
+    }
+
+    private static MemoryStream RepairMissingNumberingLevels(Stream docxStream)
+    {
+        var repairedStream = new MemoryStream();
+        docxStream.CopyTo(repairedStream);
+        repairedStream.Position = 0;
+
+        using (var archive = new ZipArchive(repairedStream, ZipArchiveMode.Update, leaveOpen: true))
+        {
+            var numberingEntry = archive.GetEntry("word/numbering.xml");
+            if (numberingEntry is not null)
+            {
+                XDocument numbering;
+                using (var numberingStream = numberingEntry.Open())
+                {
+                    numbering = XDocument.Load(numberingStream);
+                }
+
+                XNamespace word = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+                var repaired = false;
+                foreach (var abstractNum in numbering.Descendants(word + "abstractNum"))
+                {
+                    var levels = abstractNum.Elements(word + "lvl").ToArray();
+                    var usedLevels = new HashSet<int>();
+                    foreach (var level in levels)
+                    {
+                        var value = level.Attribute(word + "ilvl")?.Value;
+                        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var existingLevel))
+                        {
+                            usedLevels.Add(existingLevel);
+                        }
+                    }
+
+                    var nextLevel = 0;
+
+                    foreach (var level in levels.Where(level => level.Attribute(word + "ilvl") is null))
+                    {
+                        while (usedLevels.Contains(nextLevel))
+                        {
+                            nextLevel++;
+                        }
+
+                        level.SetAttributeValue(word + "ilvl", nextLevel);
+                        usedLevels.Add(nextLevel++);
+                        repaired = true;
+                    }
+                }
+
+                if (repaired)
+                {
+                    numberingEntry.Delete();
+                    using var numberingStream = archive.CreateEntry("word/numbering.xml", CompressionLevel.Optimal).Open();
+                    numbering.Save(numberingStream);
+                }
+            }
+        }
+
+        repairedStream.Position = 0;
+        return repairedStream;
     }
 
     private static async Task SaveFile(IFormFile file, string path)

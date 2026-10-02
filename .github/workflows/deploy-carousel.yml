@@ -41,7 +41,7 @@ jobs:
       - name: Publish carousel script
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/myblogs' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/work/myblogs' }}
           RELEASE_ID: ${{ github.sha }}
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -51,7 +51,7 @@ jobs:
           envs: DEPLOY_PATH,RELEASE_ID
           script: |
             set -eu
-            : "${DEPLOY_PATH:=/opt/myblogs}"
+            : "${DEPLOY_PATH:=/home/work/myblogs}"
             case "$RELEASE_ID" in
               ''|*[!a-f0-9]*)
                 echo "Invalid release id." >&2

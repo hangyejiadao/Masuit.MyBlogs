@@ -13,7 +13,7 @@ name: Deploy Backend
 #   QQ_SMTP_AUTH_CODE - QQ Mail SMTP authorization code for hangyejialin@qq.com
 #
 # Optional repository variables:
-#   DEPLOY_PATH   - compose directory on the server, defaults to /opt/myblogs
+#   DEPLOY_PATH   - compose directory on the server, defaults to /home/work/myblogs
 # ---------------------------------------------------------------------------
 
 on:
@@ -99,7 +99,7 @@ jobs:
         env:
           IMAGE: ${{ needs.build.outputs.image }}
           # Directory that holds the production docker-compose.yml.
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/myblogs' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/work/myblogs' }}
           # Local tag the compose file references. The freshly built image is
           # retagged onto it, so docker-compose.yml never has to change.
           LOCAL_IMAGE: myblogs/app:latest
@@ -118,7 +118,7 @@ jobs:
           # stop-on-error semantics for multi-line if/else and for/do blocks.
           script: |
             set -e
-            : "${DEPLOY_PATH:=/opt/myblogs}"
+            : "${DEPLOY_PATH:=/home/work/myblogs}"
             : "${LOCAL_IMAGE:=myblogs/app:latest}"
             cd "$DEPLOY_PATH"
             echo "Deploying $IMAGE to $DEPLOY_PATH (local tag: $LOCAL_IMAGE)"

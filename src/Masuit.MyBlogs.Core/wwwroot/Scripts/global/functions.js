@@ -297,6 +297,10 @@ async function enableSafemode() {
 
 /* 页脚按钮兼容：开启默认安全模式 */
 async function enableDefaultSafeMode() {
+  if (window.DefaultSafeMode !== "true") {
+    return;
+  }
+
   Cookies.set("Nsfw", 1, { expires: 3650 });
   window.message.success("已开启安全模式");
   location.reload();

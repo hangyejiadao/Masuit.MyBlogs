@@ -43,6 +43,12 @@ public class Post : BaseEntity, IEntityTypeConfiguration<Post>
     public string Content { get; set; }
 
     /// <summary>
+    /// 内容类型
+    /// </summary>
+    [DefaultValue(ArticleContentType.Word)]
+    public ArticleContentType ContentType { get; set; }
+
+    /// <summary>
     /// 受保护的内容
     /// </summary>
     [LuceneIndex(IsHtml = true)]

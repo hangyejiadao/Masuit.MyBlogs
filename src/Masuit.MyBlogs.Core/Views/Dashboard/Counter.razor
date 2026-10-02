@@ -199,8 +199,33 @@
     return SystemInfo.PhysicalMemory / 1048576;
   }
 
+  private static dynamic Empty() {
+    return new {
+      p50 = 0m,
+      p75 = 0m,
+      p90 = 0m,
+      p99 = 0m,
+      p999 = 0m,
+      average = 0m,
+      stdev = 0m,
+    };
+  }
+
   public Dictionary<string, dynamic> GetCounterPercent() {
     var counters = PerfCounter.CreateDataSource().Where(c => c.ServerIP == _ip).OrderByRandom().Take(15000).ToList();
+    if (counters.Count == 0) {
+      return new Dictionary<string, dynamic> {
+        ["CPU使用率(%)"] = Empty(),
+        ["内存使用量(MB)"] = Empty(),
+        ["网站CPU使用率(%)"] = Empty(),
+        ["网站内存使用量(MB)"] = Empty(),
+        ["磁盘读(KBps)"] = Empty(),
+        ["磁盘写(KBps)"] = Empty(),
+        ["网络下载(KBps)"] = Empty(),
+        ["网络上行(KBps)"] = Empty(),
+      };
+    }
+
     var cpuLoads = counters.Select(c => c.CpuLoad).ToList();
     var processCpuLoads = counters.Select(c => c.ProcessCpuLoad).ToList();
     var memUse = counters.Select(c => c.MemoryUsage).ToList();

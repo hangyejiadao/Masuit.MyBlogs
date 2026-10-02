@@ -21,6 +21,11 @@ public class PostDto : BaseDto
     public string Content { get; set; }
 
     /// <summary>
+    /// 内容类型
+    /// </summary>
+    public ArticleContentType ContentType { get; set; }
+
+    /// <summary>
     /// 文章关键词
     /// </summary>
     public string Keyword { get; set; }

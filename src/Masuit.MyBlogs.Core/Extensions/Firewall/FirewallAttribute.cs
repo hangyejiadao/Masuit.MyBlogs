@@ -127,11 +127,12 @@ public sealed class FirewallAttribute : IAsyncActionFilter
 
         //黑名单地区
         var denyAreas = CommonHelper.SystemSettings.GetOrAdd("DenyArea", "").Split(Separator, StringSplitOptions.RemoveEmptyEntries);
+        LogManager.Info($"黑名单地区判断：ip={ip}，location={location}，network={network}，pos={pos}，denyAreas=[{string.Join("|", denyAreas)}]，pos.Contains(denyAreas)={pos.Contains(denyAreas)}，denyAreas∩pos.Split(\"|\")=[{string.Join("|", denyAreas.Intersect(pos.Split("|")))}]");
         if (denyAreas.Length != 0 && (string.IsNullOrWhiteSpace(location) || string.IsNullOrWhiteSpace(network) || pos.Contains(denyAreas) || denyAreas.Intersect(pos.Split("|")).Any()))
         {
             // 未知地区的，未知网络的，禁区的
             await AccessDeny(ip, request, "访问地区限制");
-            //throw new AccessDenyException("访问地区限制");
+            throw new AccessDenyException("访问地区限制");
         }
 
         //挑战模式

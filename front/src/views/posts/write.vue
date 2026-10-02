@@ -17,8 +17,15 @@
   </div>
   <q-card flat bordered class="q-mb-md">
     <q-card-section>
-      <div class="text-h6">文章内容：</div>
-      <vue-ueditor-wrap ref="editor" v-model="post.Content" :config="{ initialFrameHeight: 500 }" />
+      <div class="row items-center q-mb-md">
+        <div class="text-h6 q-mr-md">文章内容：</div>
+        <q-btn-toggle v-model="post.ContentType" toggle-color="primary" :options="[
+            { label: 'Word 富文本', value: 0 },
+            { label: 'Markdown', value: 1 }
+          ]" no-caps unelevated dense />
+      </div>
+      <vue-ueditor-wrap v-if="post.ContentType === 0" ref="editor" v-model="post.Content" :config="{ initialFrameHeight: 500 }" />
+      <v-md-editor v-else v-model="post.Content" height="500px" placeholder="请输入 Markdown 内容" />
     </q-card-section>
   </q-card>
   <!-- 文章加密设置 -->
@@ -228,6 +235,7 @@ const post = reactive({
   Author: '',
   Email: '',
   Content: '',
+  ContentType: 0,
   ProtectContent: '',
   ProtectContentMode: 0,
   ProtectContentRegions: '',
@@ -530,6 +538,7 @@ const uploadWordDocument = async () => {
       // 将Word内容插入编辑器
       post.Title = response.Data?.Title || post.Title
       post.Content = response.Data?.Content || ''
+      post.ContentType = 0
 
       toast.success('Word文档上传成功', { position: "top-center", autoClose: 3000 })
 

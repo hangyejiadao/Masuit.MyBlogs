@@ -5,6 +5,7 @@ export interface PostData {
   Author: string
   Email: string
   Content: string
+  ContentType: number
   ProtectContent?: string
   ProtectContentMode: number
   ProtectContentRegions?: string

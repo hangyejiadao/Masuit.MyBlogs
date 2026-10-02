@@ -295,13 +295,29 @@ async function enableSafemode() {
   location.reload();
 }
 
+/* 页脚按钮兼容：开启默认安全模式 */
+async function enableDefaultSafeMode() {
+  Cookies.set("Nsfw", 1, { expires: 3650 });
+  window.message.success("已开启安全模式");
+  location.reload();
+}
+
+/* 页脚按钮兼容：关闭安全模式 */
+function clearBlockedCategory() {
+  Cookies.set("Nsfw", 0, { expires: 3650 });
+  window.message.success("已关闭安全模式");
+  location.reload();
+}
+
 /*默认安全模式*/
 document.addEventListener('DOMContentLoaded', function () {
   const { createDiscreteApi } = naive;
   const { message, dialog } = createDiscreteApi(["message", "dialog"]);
   window.message = message;
   window.dialog = dialog;
-  if (Cookies.get("Nsfw") != "0") {
+  var defaultSafeMode = window.DefaultSafeMode !== "false";
+  var safeMode = Cookies.get("Nsfw") === undefined ? defaultSafeMode : Cookies.get("Nsfw") !== "0";
+  if (safeMode) {
     let safeModeBtn = document.createElement('a');
     safeModeBtn.style.position = 'fixed';
     safeModeBtn.style.left = '0';

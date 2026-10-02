@@ -46,6 +46,7 @@ public sealed class SubscribeController : Controller
         var raw = PostService.GetQuery(PostBaseWhere().And(p => p.Rss), p => p.ModifyDate, false).Select(p => new
         {
             p.Content,
+            p.ContentType,
             p.Modifier,
             Category = p.Category.Name,
             p.ModifyDate,
@@ -54,7 +55,7 @@ public sealed class SubscribeController : Controller
         }).Cacheable(CacheExpirationMode.Absolute, TimeSpan.FromHours(2)).ToPooledListScope();
         var data = await raw.SelectAsync(async p =>
         {
-            var summary = await p.Content.GetSummary(300, 50);
+            var summary = await (p.ContentType == ArticleContentType.Markdown ? p.Content.ToHtml() : p.Content).GetSummary(300, 50);
             return new Item()
             {
                 Author = new Author
@@ -136,6 +137,7 @@ public sealed class SubscribeController : Controller
         var raw = PostService.GetQuery(PostBaseWhere().And(p => p.Rss && cids.Contains(p.CategoryId)), p => p.ModifyDate, false).Select(p => new
         {
             p.Content,
+            p.ContentType,
             p.Modifier,
             Category = p.Category.Name,
             p.ModifyDate,
@@ -144,7 +146,7 @@ public sealed class SubscribeController : Controller
         }).Cacheable(CacheExpirationMode.Absolute, TimeSpan.FromHours(2)).ToPooledListScope();
         var data = await raw.SelectAsync(async p =>
         {
-            var summary = await p.Content.GetSummary(300, 50);
+            var summary = await (p.ContentType == ArticleContentType.Markdown ? p.Content.ToHtml() : p.Content).GetSummary(300, 50);
             return new Item()
             {
                 Author = new Author
@@ -200,6 +202,7 @@ public sealed class SubscribeController : Controller
         var raw = PostService.GetQuery(PostBaseWhere().And(p => p.Rss && p.Seminar.Any(s => s.Id == id)), p => p.ModifyDate, false).Select(p => new
         {
             p.Content,
+            p.ContentType,
             p.Modifier,
             Category = p.Category.Name,
             p.ModifyDate,
@@ -208,7 +211,7 @@ public sealed class SubscribeController : Controller
         }).Cacheable(CacheExpirationMode.Absolute, TimeSpan.FromHours(2)).ToPooledListScope();
         var data = await raw.SelectAsync(async p =>
         {
-            var summary = await p.Content.GetSummary(300, 50);
+            var summary = await (p.ContentType == ArticleContentType.Markdown ? p.Content.ToHtml() : p.Content).GetSummary(300, 50);
             return new Item()
             {
                 Author = new Author
@@ -262,7 +265,7 @@ public sealed class SubscribeController : Controller
         var host = Request.Host;
         var post = await PostService.GetAsync(p => p.Rss && p.Status == Status.Published && p.Id == id) ?? throw new NotFoundException("文章未找到");
         CheckPermission(post);
-        var summary = await post.Content.GetSummary(300, 50);
+        var summary = await (post.ContentType == ArticleContentType.Markdown ? post.Content.ToHtml() : post.Content).GetSummary(300, 50);
         var item = new Item()
         {
             Author = new Author
@@ -391,6 +394,7 @@ public sealed class SubscribeController : Controller
         var raw = PostService.GetQuery(p => p.Status == Status.Published, p => p.ModifyDate, false).Select(p => new
         {
             p.Content,
+            p.ContentType,
             p.Modifier,
             Category = p.Category.Name,
             p.ModifyDate,
@@ -399,7 +403,7 @@ public sealed class SubscribeController : Controller
         }).Cacheable(CacheExpirationMode.Absolute, TimeSpan.FromHours(24)).ToPooledListScope();
         var data = await raw.SelectAsync(async p =>
         {
-            var summary = await p.Content.GetSummary(300, 50);
+            var summary = await (p.ContentType == ArticleContentType.Markdown ? p.Content.ToHtml() : p.Content).GetSummary(300, 50);
             return new Item()
             {
                 Author = new Author

@@ -1,4 +1,5 @@
 ﻿@using Masuit.MyBlogs.Core.Common
+@using Masuit.MyBlogs.Core.Models.Enum
 @using Masuit.Tools.Html
 @using Masuit.Tools.Systems
 @using FreeRedis
@@ -6,11 +7,12 @@
 @model Masuit.MyBlogs.Core.Models.DTO.PostDto
 @{
   var online = await CacheManager.SCardAsync("PostOnline:" + Model.Id);
+  var displayContent = Model.ContentType == ArticleContentType.Markdown ? Model.Content.ToHtml() : Model.Content;
 }
 <div class="article-card">
   @{
     //取第一张图片
-    string imgSrc = Model.Content.MatchFirstImgSrc();
+    string imgSrc = displayContent.MatchFirstImgSrc();
     if (!string.IsNullOrEmpty(imgSrc)) {
       <div class="cover">
         <img alt="@Model.Title" class="lazyload thumb" data-src="@imgSrc" decoding="async" loading="lazy" title="@Model.Title">
@@ -43,7 +45,7 @@
         }
       </span>
     </div>
-    <div class="summary"> @Html.Raw(await Model.Content.GetSummary(250, 50)) </div>
+    <div class="summary"> @Html.Raw(await displayContent.GetSummary(250, 50)) </div>
     <div class="bottom-row">
       <div class="tags">
         @if (!string.IsNullOrEmpty(Model.Label)) {

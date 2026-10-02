@@ -55,6 +55,9 @@
             <div class="col">
               <q-checkbox v-model="dataReadonly" label="数据写保护" />
             </div>
+            <div class="col">
+              <q-checkbox v-model="defaultSafeMode" label="默认安全模式" />
+            </div>
           </div>
         </div>
       </div>
@@ -217,6 +220,7 @@ interface Settings {
   EnableDonate?: string
   CloseSite?: string
   DataReadonly?: string
+  DefaultSafeMode?: string
   EnableSsl?: string
   RssTitle?: string
   RssDescription?: string
@@ -306,6 +310,11 @@ const closeSite = computed({
 const dataReadonly = computed({
   get: () => settings.value.DataReadonly === 'true',
   set: (val: boolean) => { settings.value.DataReadonly = val ? 'true' : 'false' }
+})
+
+const defaultSafeMode = computed({
+  get: () => settings.value.DefaultSafeMode !== 'false',
+  set: (val: boolean) => { settings.value.DefaultSafeMode = val ? 'true' : 'false' }
 })
 
 const enableSsl = computed({

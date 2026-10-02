@@ -65,7 +65,14 @@ public sealed class PostController : BaseController
     {
         if (Request.IsRobot())
         {
-            return View("Details_SEO", PostService[id] ?? throw new NotFoundException("文章未找到"));
+            var seoPost = PostService[id] ?? throw new NotFoundException("文章未找到");
+            if (seoPost.ContentType == ArticleContentType.Markdown)
+            {
+                seoPost.Content = seoPost.Content.ToHtml();
+                seoPost.ProtectContent = seoPost.ProtectContent.ToHtml();
+            }
+
+            return View("Details_SEO", seoPost);
         }
 
         if (string.IsNullOrEmpty(t))
@@ -91,6 +98,12 @@ public sealed class PostController : BaseController
         ViewBag.CommentsCount = CommentService.Count(c => c.PostId == id && c.ParentId == null && c.Status == Status.Published);
         ViewBag.HistoryCount = PostHistoryVersionService.Count(c => c.PostId == id);
         ViewBag.Keyword = post.Keyword + "," + post.Label;
+        if (post.ContentType == ArticleContentType.Markdown)
+        {
+            post.Content = post.Content.ToHtml();
+            post.ProtectContent = post.ProtectContent.ToHtml();
+        }
+
         ViewBag.Desc = await post.Content.GetSummary(200);
         var modifyDate = post.ModifyDate;
         ViewBag.Next = await PostService.GetQuery(p => p.ModifyDate > modifyDate && (p.LimitMode ?? 0) == RegionLimitMode.All && (p.Status == Status.Published || CurrentUser.IsAdmin), p => p.ModifyDate).ProjectModelBase().Cacheable().FirstOrDefaultAsync();
@@ -167,6 +180,12 @@ public sealed class PostController : BaseController
     {
         var history = await PostHistoryVersionService.GetAsync(v => v.Id == hid && (v.Post.Status == Status.Published || CurrentUser.IsAdmin)) ?? throw new NotFoundException("文章未找到");
         CheckPermission(history.Post);
+        if (history.Post.ContentType == ArticleContentType.Markdown)
+        {
+            history.Content = history.Content.ToHtml();
+            history.ProtectContent = history.ProtectContent.ToHtml();
+        }
+
         history.Content = await ReplaceVariables(history.Content).Next(s => CurrentUser.IsAdmin || Request.IsRobot() ? Task.FromResult(s) : s.InjectFingerprint(ClientIP.ToString()));
         history.ProtectContent = await ReplaceVariables(history.ProtectContent).Next(s => CurrentUser.IsAdmin || Request.IsRobot() ? Task.FromResult(s) : s.InjectFingerprint(ClientIP.ToString()));
         history.ModifyDate = history.ModifyDate.ToTimeZone(HttpContext.Session.Get<string>(SessionKey.TimeZone));
@@ -199,6 +218,13 @@ public sealed class PostController : BaseController
         var left = v2 <= 0 ? main : (await PostHistoryVersionService.GetAsync(v => v.Id == v2) ?? throw new NotFoundException("文章未找到")).ToPost();
         left.Id = main.Id;
         right.Id = main.Id;
+        if (main.ContentType == ArticleContentType.Markdown)
+        {
+            main.Content = main.Content.ToHtml();
+            left.Content = left.Content.ToHtml();
+            right.Content = right.Content.ToHtml();
+        }
+
         var posts = new[] { main, left, right }.OrderByDescending(v => v.ModifyDate).ToArray();
         var (html2, html1) = posts[2].Content.HtmlDiff(posts[1].Content,5);
         posts[2].Content = await ReplaceVariables(html2).Next(s => CurrentUser.IsAdmin || Request.IsRobot() ? Task.FromResult(s) : s.InjectFingerprint(ClientIP.ToString()));
@@ -758,7 +784,14 @@ public sealed class PostController : BaseController
     [HttpPost, MyAuthorize, DistributedLockFilter]
     public async Task<ActionResult> Edit([FromBodyOrDefault] PostCommand cmd, CancellationToken cancellationToken = default)
     {
-        cmd.Content = await ImagebedClient.ReplaceImgSrc(await cmd.Content.Trim().ClearImgAttributes(cancellationToken: cancellationToken), cancellationToken);
+        if (cmd.ContentType == ArticleContentType.Markdown)
+        {
+            cmd.Content = cmd.Content.Trim();
+        }
+        else
+        {
+            cmd.Content = await ImagebedClient.ReplaceImgSrc(await cmd.Content.Trim().ClearImgAttributes(cancellationToken: cancellationToken), cancellationToken);
+        }
         if (!ValidatePost(cmd, out var resultData))
         {
             return resultData;
@@ -838,7 +871,14 @@ public sealed class PostController : BaseController
     [MyAuthorize, HttpPost, DistributedLockFilter]
     public async Task<ActionResult> Write([FromBodyOrDefault] PostCommand cmd, [FromBodyOrDefault] DateTime? timespan, [FromBodyOrDefault] bool schedule = false, CancellationToken cancellationToken = default)
     {
-        cmd.Content = await ImagebedClient.ReplaceImgSrc(await cmd.Content.Trim().ClearImgAttributes(cancellationToken: cancellationToken), cancellationToken);
+        if (cmd.ContentType == ArticleContentType.Markdown)
+        {
+            cmd.Content = cmd.Content.Trim();
+        }
+        else
+        {
+            cmd.Content = await ImagebedClient.ReplaceImgSrc(await cmd.Content.Trim().ClearImgAttributes(cancellationToken: cancellationToken), cancellationToken);
+        }
         if (!ValidatePost(cmd, out var resultData))
         {
             return resultData;

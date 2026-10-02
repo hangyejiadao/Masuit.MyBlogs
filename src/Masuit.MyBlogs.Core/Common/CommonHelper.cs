@@ -2,6 +2,7 @@
 using AngleSharp.Css.Dom;
 using AngleSharp.Dom;
 using Dispose.Scope;
+using Markdig;
 using Masuit.Tools.Media;
 using MaxMind.GeoIP2;
 using MaxMind.GeoIP2.Responses;
@@ -297,6 +298,21 @@ namespace Masuit.MyBlogs.Core.Common
             {
                 return html;
             }
+        }
+
+        /// <summary>
+        /// Markdown 转 HTML
+        /// </summary>
+        /// <param name="markdown"></param>
+        /// <returns></returns>
+        public static string ToHtml(this string markdown)
+        {
+            if (string.IsNullOrWhiteSpace(markdown))
+            {
+                return markdown;
+            }
+
+            return Markdown.ToHtml(markdown, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
         }
 
         /// <summary>

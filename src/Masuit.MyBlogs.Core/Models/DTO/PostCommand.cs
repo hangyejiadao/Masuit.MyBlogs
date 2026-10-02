@@ -36,6 +36,11 @@ public class PostCommand : BaseEntity
     public string Content { get; set; }
 
     /// <summary>
+    /// 内容类型
+    /// </summary>
+    public ArticleContentType ContentType { get; set; } 
+
+    /// <summary>
     /// 文章关键词
     /// </summary>
     [StringLength(256, ErrorMessage = "文章关键词最大允许255个字符")]

@@ -45,7 +45,7 @@ public class BaseController : Controller
 
     private int[] HideCategories => Request.GetHideCategories();
 
-    private bool SafeMode => !Request.Cookies.ContainsKey("Nsfw") || Request.Cookies["Nsfw"] == "1";
+    private bool SafeMode => Request.Cookies.ContainsKey("Nsfw") ? Request.Cookies["Nsfw"] == "1" : CommonHelper.SystemSettings.GetOrAdd("DefaultSafeMode", "true") == "true";
 
     /// <summary>
     /// 响应数据

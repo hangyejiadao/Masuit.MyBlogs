@@ -303,6 +303,8 @@ async function enableDefaultSafeMode() {
 
   localStorage.setItem("DefaultSafeMode", 1);
   Cookies.set("Nsfw", 1, { expires: 3650 });
+  window.message.success("已开启安全模式");
+  location.reload();
 }
 
 /* 页脚按钮兼容：关闭安全模式 */

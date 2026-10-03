@@ -220,7 +220,7 @@ SQL
 无需服务器即可验证镜像能否构建：
 
 ```bash
-docker build -t masuit-myblogs:local .
+python deploy/build_backend.py --tag masuit-myblogs:local
 docker run --rm -p 5000:5000 \
   -v "$PWD/src/Masuit.MyBlogs.Core/appsettings.json:/app/appsettings.json:ro" \
   masuit-myblogs:local
@@ -252,3 +252,34 @@ GHCR 包默认私有。若服务器拉取镜像失败，二选一：
 **Q: 镜像更新后前端仍显示旧版怎么办？**
 应用镜像不负责发布前端。请检查 `Deploy Dashboard` 工作流是否成功；该工作流
 直接更新宿主机挂载目录中的 `dashboard`，无需重启应用容器。
+
+## 后端发布版本信息
+
+本地与 GitHub Actions 共用 `deploy/build_backend.py`，每次构建生成独立版本号：
+`yyyyMMdd.HHmmss-<8位提交号>-<8位随机后缀>`，时间使用北京时间（UTC+8）。
+同一个 Git 提交重复构建，也会产生不同版本号。
+
+本地构建（需要 Python 3、Git、Docker）：
+
+```powershell
+python deploy/build_backend.py
+# 或指定镜像标签，并保存一份元数据（输出文件请放到仓库外，避免被计为未提交改动）
+python deploy/build_backend.py --tag myblogs/app:local --output "$env:TEMP/myblogs-version.json"
+```
+
+镜像内 `/app/version.json` 记录：版本号、UTC/北京时间、完整提交号、分支、工作区
+是否有未提交改动、最近 20 条提交的作者/提交时间/完整提交日志，以及 CI 运行编号。
+本地有未提交改动时 `git.dirty=true`；提交日志只对应已提交的 Git 历史，并非未提交
+代码的内容证明。打包时间指构建脚本开始执行时间，而不是上传、部署或容器启动时间。
+
+文件位于应用根目录，不受 `wwwroot`、`App_Data` 和配置文件挂载覆盖，不提供公开 HTTP
+接口。镜像的 OCI 标签同时记录版本号、提交号和打包时间。运行时读取：
+
+```bash
+sudo docker exec myblogs-app cat /app/version.json
+sudo docker inspect myblogs-app --format '{{.Config.Image}}'
+sudo docker image inspect myblogs/app:local --format '{{json .Config.Labels}}'
+```
+
+GitHub Actions 自动读取完整 Git 历史、生成元数据并传入 Docker，同时推送版本号标签。
+不带元数据的裸 `docker build` 会明确失败，请使用上面的脚本，避免发布缺少追溯信息的镜像。

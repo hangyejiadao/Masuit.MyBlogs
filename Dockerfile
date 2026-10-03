@@ -33,11 +33,20 @@ RUN dotnet publish Masuit.MyBlogs.Core/Masuit.MyBlogs.Core.csproj \
         --no-restore \
         -o /app/publish
 
+# Keep release metadata outside mounted config/data/wwwroot directories.
+# Required on every build so a cached image cannot masquerade as a new release.
+ARG RELEASE_METADATA_BASE64
+RUN test -n "$RELEASE_METADATA_BASE64" \
+    || (echo "Missing release metadata: use python deploy/build_backend.py" >&2; exit 1)
+RUN printf '%s' "$RELEASE_METADATA_BASE64" | base64 -d > /app/publish/version.json \
+    && test -s /app/publish/version.json
+
 # ---------------------------------------------------------------------------
 # Runtime stage
 # ---------------------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
 
 # Runtime dependencies of the app:
 #   libfontconfig1, libfreetype6 - required by SkiaSharp's libSkiaSharp.so
@@ -69,6 +78,13 @@ COPY --from=build /app/publish ./
 #   /app/wwwroot/upload : user uploads (UploadPath system setting)
 #   /app/App_Data/cert  : optional HTTPS certificate (only when Https:Enabled = true)
 RUN mkdir -p /app/logs /app/lucene /app/wwwroot/upload /app/App_Data/cert
+
+ARG RELEASE_VERSION
+ARG RELEASE_COMMIT
+ARG RELEASE_BUILT_AT
+LABEL org.opencontainers.image.version=$RELEASE_VERSION \
+      org.opencontainers.image.revision=$RELEASE_COMMIT \
+      org.opencontainers.image.created=$RELEASE_BUILT_AT
 
 EXPOSE 5000 5001
 

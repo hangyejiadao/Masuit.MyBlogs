@@ -681,3 +681,56 @@ createApp({
     }
   },
 }).use(naive).mount('#postApp');
+// 为文章代码块添加复制按钮，只复制当前代码内容。
+(function initCodeBlockCopy() {
+  const install = () => {
+    document.querySelectorAll('.article-content pre').forEach((pre) => {
+      if (pre.querySelector('.code-copy-btn')) return;
+      const code = pre.querySelector('code');
+      if (!code) return;
+
+      pre.classList.add('article-code-block');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'code-copy-btn';
+      button.textContent = '复制';
+      button.setAttribute('aria-label', '复制代码');
+
+      button.addEventListener('click', async () => {
+        const value = code.textContent || '';
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            if (!document.execCommand('copy')) throw new Error('copy failed');
+            textarea.remove();
+          }
+          button.textContent = '已复制';
+          button.classList.add('copied');
+          window.setTimeout(() => {
+            button.textContent = '复制';
+            button.classList.remove('copied');
+          }, 1600);
+        } catch (error) {
+          button.textContent = '复制失败';
+          window.setTimeout(() => { button.textContent = '复制'; }, 1600);
+        }
+      });
+
+      pre.appendChild(button);
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', install, { once: true });
+  } else {
+    install();
+  }
+})();

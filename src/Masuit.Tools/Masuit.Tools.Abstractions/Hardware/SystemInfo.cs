@@ -685,7 +685,18 @@ namespace Masuit.Tools.Hardware
         /// <returns></returns>
         public static IPAddress GetLocalUsedIP(AddressFamily family)
         {
-            return NetworkInterface.GetAllNetworkInterfaces().Where(c => c.NetworkInterfaceType != NetworkInterfaceType.Loopback && c.OperationalStatus == OperationalStatus.Up).OrderByDescending(c => c.Speed).Select(t => t.GetIPProperties()).Where(p => p.DhcpServerAddresses.Count > 0).SelectMany(p => p.UnicastAddresses).Select(p => p.Address).FirstOrDefault(p => !(p.IsIPv6Teredo || p.IsIPv6LinkLocal || p.IsIPv6Multicast || p.IsIPv6SiteLocal) && p.AddressFamily == family);
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces().Where(c => c.NetworkInterfaceType != NetworkInterfaceType.Loopback && c.OperationalStatus == OperationalStatus.Up).OrderByDescending(c => c.Speed).Select(t => t.GetIPProperties()).ToList();
+            // Linux等平台（含容器）解析不出DHCP服务器地址，此时回退到任意可用的网卡地址，避免返回null
+            return interfaces.Where(p => p.DhcpServerAddresses.Count > 0).SelectMany(p => p.UnicastAddresses).Select(p => p.Address).FirstOrDefault(p => IsUsableAddress(p, family))
+                   ?? interfaces.SelectMany(p => p.UnicastAddresses).Select(p => p.Address).FirstOrDefault(p => IsUsableAddress(p, family));
+        }
+
+        /// <summary>
+        /// 判断地址是否为指定地址族下可用的本机地址
+        /// </summary>
+        private static bool IsUsableAddress(IPAddress address, AddressFamily family)
+        {
+            return address.AddressFamily == family && !(address.IsIPv6Teredo || address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal);
         }
 
         /// <summary>

@@ -100,7 +100,7 @@ public sealed class SystemController : AdminController
     /// <returns></returns>
     public IActionResult GetCounterHistory(string ip = null)
     {
-        ip = ip.IfNullOrEmpty(() => SystemInfo.GetLocalUsedIP(AddressFamily.InterNetwork).ToString());
+        ip = ip.IfNullOrEmpty(() => IPerfCounter.ServerIP);
         var time = DateTime.Now.AddDays(-15).GetTotalMilliseconds();
         var counters = PerfCounter.CreateDataSource().Where(c => c.ServerIP == ip && c.Time >= time);
         var count = counters.Count();
@@ -142,12 +142,12 @@ public sealed class SystemController : AdminController
             mem = list.Select(c => new[]
             {
                 c.Time,
-                (c.MemoryUsage * 1048576 / SystemInfo.PhysicalMemory*100).ToDecimal(2)
+                (c.MemoryUsage * 1048576 / IPerfCounter.TotalPhysicalMemory*100).ToDecimal(2)
             }),
             processMem = list.Select(c => new[]
             {
                 c.Time,
-                (c.ProcessMemoryUsage * 1048576 / SystemInfo.PhysicalMemory*100).ToDecimal(2)
+                (c.ProcessMemoryUsage * 1048576 / IPerfCounter.TotalPhysicalMemory*100).ToDecimal(2)
             }),
             read = list.Select(c => new[]
             {

@@ -13,6 +13,16 @@ public interface IPerfCounter
     public static Process CurrentProcess = System.Diagnostics.Process.GetCurrentProcess();
     public static readonly DateTime StartTime = DateTime.Now;
 
+    /// <summary>
+    /// 当前服务器标识：优先使用正在使用的IP，取不到时回退到主机名，保证性能数据的写入与查询使用同一个值
+    /// </summary>
+    public static string ServerIP { get; } = SystemInfo.GetLocalUsedIP(AddressFamily.InterNetwork)?.ToString() ?? Environment.MachineName;
+
+    /// <summary>
+    /// 物理内存总量(字节)：Windows下取系统物理内存，其它平台（含容器）取运行时检测到的内存上限
+    /// </summary>
+    public static long TotalPhysicalMemory { get; } = SystemInfo.PhysicalMemory > 0 ? SystemInfo.PhysicalMemory : Math.Max(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, 1);
+
     public static void Init()
     {
         Task.Run(() =>
@@ -65,7 +75,7 @@ public interface IPerfCounter
             DiskWrite = write,
             Download = down,
             Upload = up,
-            ServerIP = SystemInfo.GetLocalUsedIP(AddressFamily.InterNetwork).ToString()
+            ServerIP = IPerfCounter.ServerIP
         };
     }
 

@@ -31,19 +31,19 @@
         </tr>
         <tr>
             <td>CPU型号</td>
-            <th>@_cpu.Type</th>
+            <th>@Cpu.Type</th>
             <td>CPU基础频率</td>
-            <th>@_cpu.CurrentClockSpeed MHz</th>
+            <th>@Cpu.CurrentClockSpeed MHz</th>
             <td>CPU睿频</td>
-            <th>@_cpu.MaxClockSpeed MHz</th>
+            <th>@Cpu.MaxClockSpeed MHz</th>
         </tr>
         <tr>
             <td>CPU个数</td>
-            <th>@SystemInfo.GetCpuInfo().Count 插槽</th>
+            <th>@_cpus.Count 插槽</th>
             <td>CPU核心数</td>
-            <th>@_cpu.NumberOfCores 核心</th>
+            <th>@Cpu.NumberOfCores 核心</th>
             <td>CPU线程数</td>
-            <th>@_cpu.NumberOfLogicalProcessors 线程</th>
+            <th>@Cpu.NumberOfLogicalProcessors 线程</th>
         </tr>
         <tr>
             <td>物理总内存</td>
@@ -87,7 +87,7 @@
         </tr>
         <tr>
             <td>Redis版本</td>
-            <th>@CacheManager.Info("server").Split("\r\n").Select(s => s.Split(':')).FirstOrDefault(s => s[0] == "redis_version")![1]</th>
+            <th>@_redisVersion</th>
             <td>Redis内存使用</td>
             <th>@_cacheMemoryUsed.ToString("F")MB</th>
             <td>Redis缓存命中率</td>
@@ -95,7 +95,7 @@
         </tr>
         <tr>
             <td>Redis执行命令数</td>
-            <th>@_redisStats["total_commands_processed"]</th>
+            <th>@_redisStats.GetValueOrDefault("total_commands_processed")</th>
             <td>网站CPU使用率</td>
             <th>@(GetCurrentPerformanceCounter().ProcessCpuLoad.ToDecimal(2))%</th>
             <td>网站内存使用</td>
@@ -162,22 +162,66 @@
   private readonly Process _process = Process.GetCurrentProcess();
   private readonly Process[] _processes = Process.GetProcesses();
   private string _bootTime;
-  private readonly string _ip = SystemInfo.GetLocalUsedIP(AddressFamily.InterNetwork).ToString();
+  private readonly string _ip = IPerfCounter.ServerIP;
   private string _runningTime;
-  private readonly CpuInfo _cpu = SystemInfo.GetCpuInfo()[0];
+  private readonly IReadOnlyList<CpuInfo> _cpus = GetCpuInfos();
+  private CpuInfo Cpu => _cpus[0];
   private readonly RamInfo _memory = SystemInfo.GetRamInfo();
   private readonly List<PhysicalAddress> _macs = SystemInfo.GetMacAddress().ToList();
   private readonly IList<string> _ips = SystemInfo.GetLocalIPs().OrderBy(u => u.Address.AddressFamily != AddressFamily.InterNetwork).Select(a => a.Address.ToString()).ToList();
-  private readonly DriveInfo[] _driveInfos = DriveInfo.GetDrives().Where(d => d.IsReady).ToArray();
+  private readonly DriveInfo[] _driveInfos = GetDriveInfos();
   private decimal _cacheHits;
   private decimal _cacheMemoryUsed;
-  private IDictionary<string, decimal> _redisStats;
+  private IReadOnlyDictionary<string, decimal> _redisStats = new Dictionary<string, decimal>();
+  private string _redisVersion = "未知";
+
+  private static IReadOnlyList<CpuInfo> GetCpuInfos() {
+    var cpus = SystemInfo.GetCpuInfo();
+    //Linux等平台获取不到CPU信息，回退到逻辑处理器数量，避免访问_cpu时索引越界
+    return cpus is { Count: > 0 } ? cpus : new List<CpuInfo> {
+      new() {
+        NumberOfCores = Environment.ProcessorCount,
+        NumberOfLogicalProcessors = Environment.ProcessorCount
+      }
+    };
+  }
+
+  private static DriveInfo[] GetDriveInfos() {
+    //容器等环境下会枚举出/proc、/sys等大小为0的挂载点，过滤掉它们，避免计算可用率时除零
+    return DriveInfo.GetDrives().Where(d => {
+      try {
+        return d.IsReady && d.TotalSize > 0;
+      }
+      catch (Exception) {
+        return false;
+      }
+    }).ToArray();
+  }
+
+  private static Dictionary<string, string> ParseRedisInfo(string info) {
+    var result = new Dictionary<string, string>();
+    foreach (var line in (info ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries)) {
+      var separator = line.IndexOf(':');
+      if (separator > 0 && !line.StartsWith('#')) {
+        result[line[..separator]] = line[(separator + 1)..].TrimEnd('\r');
+      }
+    }
+    return result;
+  }
 
   protected override void OnInitialized() {
-    _redisStats = CacheManager.Info("stats").Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Select(s => s.Split(':')).Where(s => s.Length == 2).ToFrozenDictionary(s => s[0], s => s[1].ToDecimal());
-    _cacheHits = _redisStats["keyspace_hits"] / (_redisStats["keyspace_hits"] + _redisStats["keyspace_misses"]);
-    _cacheMemoryUsed = CacheManager.Info("memory").Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Select(s => s.Split(':')).FirstOrDefault(s => s[0] == "used_memory")![1].ToDecimal() / 1048576;
-    var boot = DateTime.Now - SystemInfo.BootTime();
+    _redisStats = ParseRedisInfo(CacheManager.Info("stats")).ToFrozenDictionary(s => s.Key, s => s.Value.ToDecimal());
+    var hits = _redisStats.GetValueOrDefault("keyspace_hits");
+    var misses = _redisStats.GetValueOrDefault("keyspace_misses");
+    _cacheHits = hits + misses > 0 ? hits / (hits + misses) : 0;
+    _cacheMemoryUsed = ParseRedisInfo(CacheManager.Info("memory")).GetValueOrDefault("used_memory").ToDecimal() / 1048576;
+    _redisVersion = ParseRedisInfo(CacheManager.Info("server")).GetValueOrDefault("redis_version") ?? "未知";
+    var bootTime = SystemInfo.BootTime();
+    if (bootTime == default) {
+      //Linux等平台获取不到系统开机时间，回退到系统运行时长
+      bootTime = DateTime.Now - TimeSpan.FromMilliseconds(Environment.TickCount64);
+    }
+    var boot = DateTime.Now - bootTime;
     var span = DateTime.Now - IPerfCounter.StartTime;
     _runningTime = $"{span.Days}天{span.Hours}小时{span.Minutes}分钟";
     _bootTime = $"{boot.Days}天{boot.Hours}小时{boot.Minutes}分钟";
@@ -196,7 +240,7 @@
 
   [JSInvokable]
   public static long GetTotalMemory() {
-    return SystemInfo.PhysicalMemory / 1048576;
+    return IPerfCounter.TotalPhysicalMemory / 1048576;
   }
 
   private static dynamic Empty() {

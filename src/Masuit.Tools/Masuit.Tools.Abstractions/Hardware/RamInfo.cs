@@ -40,6 +40,6 @@
         /// <summary>
         /// 内存使用率
         /// </summary>
-        public double MemoryUsage => (1 - MemoryAvailable / PhysicalMemory) * 100;
+        public double MemoryUsage => PhysicalMemory > 0 ? (1 - MemoryAvailable / PhysicalMemory) * 100 : 0;
     }
 }

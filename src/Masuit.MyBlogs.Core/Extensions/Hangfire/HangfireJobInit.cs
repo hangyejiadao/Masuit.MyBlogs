@@ -24,6 +24,8 @@ public static class HangfireJobInit
         }); //每周的任务
         RecurringJob.AddOrUpdate<IHangfireBackJob>("EverymonthJob", job => job.EverymonthJob(), Cron.Monthly(1, 0, 0)); //每月的任务
         RecurringJob.AddOrUpdate<IHangfireBackJob>("StatisticsSearchKeywords", job => job.StatisticsSearchKeywords(), Cron.Hourly); //每小时的任务
+        RecurringJob.AddOrUpdate<IHangfireBackJob>(nameof(IHangfireBackJob.CleanupHttpRequestLogs), job => job.CleanupHttpRequestLogs(), Cron.Minutely);
+        BackgroundJob.Enqueue<IHangfireBackJob>(job => job.CleanupHttpRequestLogs());
         BackgroundJob.Enqueue<IHangfireBackJob>(job => job.StatisticsSearchKeywords());
     }
 }

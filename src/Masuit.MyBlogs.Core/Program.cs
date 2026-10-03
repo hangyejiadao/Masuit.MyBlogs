@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System.Diagnostics;
 using AngleSharp.Text;
 using Serilog;
+using Serilog.Events;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 try
@@ -22,15 +23,25 @@ catch
     // ignored
 }
 
-await Host.CreateDefaultBuilder(args).ConfigureAppConfiguration(builder => builder.AddJsonFile("appsettings.json", true, true)).UseSerilog((_, loggerConfiguration) => loggerConfiguration
-    .MinimumLevel.Information()
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.File(
-        Path.Combine(AppContext.BaseDirectory, "logs", "log-.txt"),
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: null,
-        retainedFileTimeLimit: TimeSpan.FromDays(7)))
+await Host.CreateDefaultBuilder(args).ConfigureAppConfiguration(builder => builder.AddJsonFile("appsettings.json", true, true)).UseSerilog((_, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+
+    foreach (var level in Enum.GetValues<LogEventLevel>())
+    {
+        loggerConfiguration.WriteTo.Logger(levelLogger => levelLogger
+            .MinimumLevel.Verbose()
+            .Filter.ByIncludingOnly(logEvent => logEvent.Level == level)
+            .WriteTo.File(
+                Path.Combine(AppContext.BaseDirectory, "logs", level.ToString(), "log-.txt"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: null,
+                retainedFileTimeLimit: TimeSpan.FromDays(7)));
+    }
+})
     .UseServiceProviderFactory(new AutofacServiceProviderFactory()).ConfigureWebHostDefaults(hostBuilder => hostBuilder.UseQuic().UseKestrel(opt =>
 {
     var config = opt.ApplicationServices.GetService<IConfiguration>();

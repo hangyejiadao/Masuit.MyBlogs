@@ -33,6 +33,30 @@ public sealed class HangfireBackJob : Disposable, IHangfireBackJob
     }
 
     /// <summary>
+    /// Retain only the latest 10,000 HTTP request logs.
+    /// </summary>
+    public async Task CleanupHttpRequestLogs()
+    {
+        const int retainedCount = 10000;
+        var dbContext = _serviceScope.ServiceProvider.GetRequiredService<LoggerDbContext>();
+        var logs = dbContext.Set<HttpRequestLog>();
+        // Use a fixed cutoff so concurrent inserts are not included in the deletion.
+        var cutoff = await logs.AsNoTracking()
+            .OrderByDescending(log => log.Time)
+            .ThenByDescending(log => log.Id)
+            .Skip(retainedCount - 1)
+            .Select(log => new { log.Time, log.Id })
+            .FirstOrDefaultAsync();
+        if (cutoff is null)
+        {
+            return;
+        }
+
+        await logs.Where(log => log.Time < cutoff.Time || (log.Time == cutoff.Time && log.Id < cutoff.Id))
+            .ExecuteDeleteAsync();
+    }
+
+    /// <summary>
     /// 登录记录
     /// </summary>
     /// <param name="userInfo"></param>

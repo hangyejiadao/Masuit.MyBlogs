@@ -61,4 +61,9 @@ public interface IHangfireBackJob
 	/// 搜索统计
 	/// </summary>
 	void StatisticsSearchKeywords();
+
+	/// <summary>
+	/// Retain only the latest 10,000 HTTP request logs.
+	/// </summary>
+	Task CleanupHttpRequestLogs();
 }

@@ -256,7 +256,11 @@
   }
 
   public Dictionary<string, dynamic> GetCounterPercent() {
-    var counters = PerfCounter.CreateDataSource().Where(c => c.ServerIP == _ip).OrderByRandom().Take(15000).ToList();
+    var query = PerfCounter.CreateDataSource().Where(c => c.ServerIP == _ip);
+    // In-memory IQueryable must use LINQ-to-Objects random ordering, not EF.Functions.Random().
+    var counters = query.Provider is EnumerableQuery<Masuit.MyBlogs.Core.Common.PerformanceCounter>
+      ? query.AsEnumerable().OrderByRandom().Take(15000).ToList()
+      : query.OrderByRandom().Take(15000).ToList();
     if (counters.Count == 0) {
       return new Dictionary<string, dynamic> {
         ["CPU使用率(%)"] = Empty(),

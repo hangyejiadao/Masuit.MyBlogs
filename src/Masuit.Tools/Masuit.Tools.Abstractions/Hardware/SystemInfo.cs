@@ -191,7 +191,7 @@ namespace Masuit.Tools.Hardware
         {
             try
             {
-                if (!IsWinPlatform) return [];
+                if (!IsWinPlatform) return GetLinuxCpuInfo();
                 return CpuObjects.Value.Select(mo => new CpuInfo
                 {
                     NumberOfLogicalProcessors = ProcessorCount,
@@ -221,6 +221,56 @@ namespace Masuit.Tools.Hardware
                     }
                 ];
             }
+        }
+
+        private static List<CpuInfo> GetLinuxCpuInfo()
+        {
+            var path = File.Exists("/host/proc/cpuinfo") ? "/host/proc/cpuinfo" : "/proc/cpuinfo";
+            if (!File.Exists(path)) return [];
+            var processors = new List<Dictionary<string, string>>();
+            var current = new Dictionary<string, string>();
+            foreach (var line in File.ReadLines(path))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    if (current.ContainsKey("processor")) processors.Add(current);
+                    current = new Dictionary<string, string>();
+                    continue;
+                }
+                var separator = line.IndexOf(':');
+                if (separator > 0) current[line.Substring(0, separator).Trim()] = line.Substring(separator + 1).Trim();
+            }
+            if (current.ContainsKey("processor")) processors.Add(current);
+            return processors.GroupBy(p => p.TryGetValue("physical id", out var id) ? id : "0").Select(group =>
+            {
+                var first = group.First();
+                string Value(string key) => first.TryGetValue(key, out var value) ? value : null;
+                var cores = group.Where(p => p.ContainsKey("core id")).Select(p => p["core id"]).Distinct().Count();
+                if (cores == 0) int.TryParse(Value("cpu cores"), out cores);
+                var cpu = Value("processor") ?? "0";
+                var sysRoot = Directory.Exists("/host/sys/devices/system/cpu") ? "/host/sys/devices/system/cpu" : "/sys/devices/system/cpu";
+                string Frequency(string name)
+                {
+                    var file = Path.Combine(sysRoot, "cpu" + cpu, "cpufreq", name);
+                    try
+                    {
+                        return File.Exists(file) && long.TryParse(File.ReadAllText(file).Trim(), out var khz)
+                            ? (khz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+                    }
+                    catch (IOException) { return null; }
+                    catch (UnauthorizedAccessException) { return null; }
+                }
+                return new CpuInfo
+                {
+                    DeviceID = "CPU" + group.Key,
+                    Type = Value("model name") ?? Value("Processor") ?? "Unknown",
+                    Manufacturer = Value("vendor_id") ?? Value("CPU implementer"),
+                    NumberOfCores = cores,
+                    NumberOfLogicalProcessors = group.Count(),
+                    CurrentClockSpeed = Frequency("base_frequency"),
+                    MaxClockSpeed = Frequency("cpuinfo_max_freq")
+                };
+            }).ToList();
         }
 
 #if NET5_0_OR_GREATER

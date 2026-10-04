@@ -304,6 +304,11 @@ public sealed class SystemController : AdminController
     public ActionResult<PooledList<JObject>> SendBox()
     {
         var keys = RedisHelper.Keys("Email:*");
+        if (keys.Length == 0)
+        {
+            return Enumerable.Empty<JObject>().ToPooledListScope();
+        }
+
         return RedisHelper.SUnion(keys).Select(JObject.Parse).OrderByDescending(o => o["time"]).ToPooledListScope();
     }
 

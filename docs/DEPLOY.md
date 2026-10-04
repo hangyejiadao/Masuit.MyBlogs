@@ -268,12 +268,12 @@ python deploy/build_backend.py --tag myblogs/app:local --output "$env:TEMP/myblo
 ```
 
 镜像内 `/app/version.json` 记录：版本号、UTC/北京时间、完整提交号、分支、工作区
-是否有未提交改动、最近 20 条提交的作者/提交时间/完整提交日志，以及 CI 运行编号。
+是否有未提交改动、最近 2 条提交的作者/提交时间/完整提交日志，以及 CI 运行编号。
 本地有未提交改动时 `git.dirty=true`；提交日志只对应已提交的 Git 历史，并非未提交
 代码的内容证明。打包时间指构建脚本开始执行时间，而不是上传、部署或容器启动时间。
 
-文件位于应用根目录，不受 `wwwroot`、`App_Data` 和配置文件挂载覆盖，不提供公开 HTTP
-接口。镜像的 OCI 标签同时记录版本号、提交号和打包时间。运行时读取：
+文件位于应用根目录，不受 `wwwroot`、`App_Data` 和配置文件挂载覆盖，通过 `/version.json` 提供公开 JSON
+接口（不需登录，禁用缓存）。镜像的 OCI 标签同时记录版本号、提交号和打包时间。运行时读取：
 
 ```bash
 sudo docker exec myblogs-app cat /app/version.json

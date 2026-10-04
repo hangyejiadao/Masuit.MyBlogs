@@ -23,7 +23,7 @@ def create_metadata():
     commit = git("rev-parse", "HEAD")
     # Read each message separately: commit messages may contain any delimiter.
     commits = []
-    for sha in git("rev-list", "--max-count=20", "HEAD").splitlines():
+    for sha in git("rev-list", "--max-count=2", "HEAD").splitlines():
         commits.append({
             "sha": sha,
             "author": git("show", "-s", "--format=%an", sha),

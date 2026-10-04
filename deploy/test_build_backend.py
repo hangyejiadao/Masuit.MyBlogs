@@ -13,10 +13,13 @@ spec.loader.exec_module(build_backend)
 class ReleaseMetadataTests(unittest.TestCase):
     def test_metadata_preserves_commit_messages_and_has_unique_versions(self):
         sha = "a" * 40
+        second_sha = "b" * 40
         message = '中文提交\n\n包含 "引号"、\\ 和多行日志'
         def fake_git(*args):
             if args[0] == "rev-parse": return sha
-            if args[0] == "rev-list": return sha
+            if args[0] == "rev-list":
+                self.assertEqual(args, ("rev-list", "--max-count=2", "HEAD"))
+                return "\n".join([sha, second_sha])
             if args[0] == "branch": return "master"
             if args[0] == "status": return " M Dockerfile"
             return {"--format=%an": "作者", "--format=%cI": "2026-10-03T12:00:00+08:00", "--format=%B": message}[args[2]]
@@ -25,6 +28,7 @@ class ReleaseMetadataTests(unittest.TestCase):
             second = build_backend.create_metadata()
         decoded = json.loads(base64.b64decode(build_backend.encode_metadata(first)))
         self.assertEqual(decoded, first)
+        self.assertEqual([item["sha"] for item in first["git"]["commits"]], [sha, second_sha])
         self.assertEqual(first["git"]["commits"][0]["message"], message)
         self.assertTrue(first["git"]["dirty"])
         self.assertNotEqual(first["version"], second["version"])

@@ -46,6 +46,7 @@ jobs:
     outputs:
       # Deploy the unique build tag, not a SHA tag shared by repeated builds.
       image: ${{ env.REGISTRY }}/${{ steps.name.outputs.lower }}:${{ steps.release.outputs.version }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -117,12 +118,14 @@ jobs:
           # Local tag the compose file references. The freshly built image is
           # retagged onto it, so docker-compose.yml never has to change.
           LOCAL_IMAGE: myblogs/app:latest
+          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_VERSION: ${{ needs.build.outputs.version }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs: IMAGE,DEPLOY_PATH,LOCAL_IMAGE
+          envs: IMAGE,DEPLOY_PATH,LOCAL_IMAGE,EXPECTED_COMMIT,EXPECTED_VERSION
           # Do NOT enable script_stop here: drone-ssh implements it by splitting
           # the script into one line per command and appending an exit-code guard
           # after every line. That guard also runs after an `if <test>; then` line,
@@ -151,13 +154,26 @@ jobs:
             fi
             echo "Docker access: ${SUDO:-(direct)}"
 
+            # Support both the existing production `app` stack and repository `web`.
+            # The latter uses ${IMAGE}; explicitly pass the tag to sudo as well.
+            compose() { $SUDO env IMAGE="$LOCAL_IMAGE" docker compose "$@"; }
+            services=$(compose config --services)
+            if printf '%s\n' "$services" | grep -qx app; then
+              APP_SERVICE=app
+            elif printf '%s\n' "$services" | grep -qx web; then
+              APP_SERVICE=web
+            else
+              echo "ERROR: compose has no app or web service." >&2
+              exit 1
+            fi
+
             # Host port the compose file publishes, used by the readiness check.
             APP_PORT=$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
             : "${APP_PORT:=5000}"
 
             # Keep the release that is currently live so it can be restored with
             #   docker tag myblogs/app:previous myblogs/app:latest
-            #   docker compose up -d --no-build app
+            #   docker compose up -d --no-build <app-or-web>
             if $SUDO docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
               $SUDO docker tag "$LOCAL_IMAGE" "myblogs/app:previous"
             fi
@@ -165,32 +181,43 @@ jobs:
             echo "Pulling $IMAGE"
             $SUDO docker pull "$IMAGE"
 
-            # Only the app image is swapped: the compose file pins a local tag, and
+            # Only the backend image is swapped using the local tag;
             # db / redis / volumes / nginx keep running exactly as they are.
             $SUDO docker tag "$IMAGE" "$LOCAL_IMAGE"
-            $SUDO docker compose up -d --no-build app
-
-            # The image has no HEALTHCHECK, so poll the published port instead.
-            # On a connection failure curl both prints 000 and exits non-zero, so
-            # the status must come from the fallback assignment, not from `|| echo`.
-            echo "Waiting for http://127.0.0.1:$APP_PORT/ to answer..."
-            ready=""
-            for i in $(seq 1 30); do
-              code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$APP_PORT/" 2>/dev/null) || code="000"
-              echo "  [$i/30] http=$code"
-              if [ "$code" != "000" ]; then
-                ready=1
-                break
-              fi
-              sleep 5
-            done
-            if [ -z "$ready" ]; then
-              echo "ERROR: the app did not answer on port $APP_PORT within 150s." >&2
-              $SUDO docker compose logs --tail=80 app
+            compose up -d --no-build --no-deps --force-recreate "$APP_SERVICE"
+            expected_image=$($SUDO docker image inspect "$IMAGE" --format '{{.Id}}')
+            container=$(compose ps -q "$APP_SERVICE")
+            test -n "$container"
+            actual_image=$($SUDO docker inspect "$container" --format '{{.Image}}')
+            if [ "$actual_image" != "$expected_image" ]; then
+              echo "ERROR: running container does not use the newly built image." >&2
               exit 1
             fi
 
-            $SUDO docker compose ps
+            # Require HTTP 200 AND this build version; any response is not readiness.
+            echo "Waiting for http://127.0.0.1:$APP_PORT/version.json to answer with version $EXPECTED_VERSION..."
+            ready=""
+            for i in $(seq 1 30); do
+              body=$(mktemp)
+              code=$(curl -fsS -o "$body" -w '%{http_code}' -m 5 "http://127.0.0.1:$APP_PORT/version.json" 2>/dev/null) || code="000"
+              echo "  [$i/30] version.json http=$code"
+              if [ "$code" = "200" ] &&
+                 grep -Fq "\"version\": \"$EXPECTED_VERSION\"" "$body" &&
+                 grep -Fq "\"commit\": \"$EXPECTED_COMMIT\"" "$body"; then
+                ready=1
+                rm -f "$body"
+                break
+              fi
+              rm -f "$body"
+              sleep 5
+            done
+            if [ -z "$ready" ]; then
+              echo "ERROR: expected release metadata was not served on port $APP_PORT within 150s." >&2
+              compose logs --tail=80 "$APP_SERVICE"
+              exit 1
+            fi
+
+            compose ps
             echo "Deployment finished."
       - name: Send deployment success email
         if: success()

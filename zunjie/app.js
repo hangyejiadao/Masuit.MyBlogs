@@ -1,5 +1,5 @@
-import { BrakeGame } from './engine.mjs';
-import { TrackScene } from './scene.mjs';
+import { BrakeGame } from './engine.js';
+import { TrackScene } from './scene.js';
 
 const $ = (id) => document.getElementById(id);
 const game = new BrakeGame();

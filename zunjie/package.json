@@ -1,9 +1,11 @@
 {
   "name": "redline-brake-game",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "type": "module",
   "private": true,
   "description": "A cinematic brake-control mini-game inspired by breakbreak.app",
   "scripts": {
+    "build": "node build.mjs",
     "start": "node server.mjs",
     "test": "node --test engine.test.mjs"
   }

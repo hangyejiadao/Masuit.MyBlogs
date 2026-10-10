@@ -1,0 +1,107 @@
+name: Deploy Redline Game
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'zunjie/**'
+      - '.github/workflows/deploy-zunjie.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-zunjie
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/work/myblogs' }}
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run game tests
+        working-directory: zunjie
+        run: npm test
+
+      - name: Package game
+        run: |
+          npm run build --prefix zunjie
+          tar -czf zunjie-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz -C zunjie/_site .
+
+      - name: Upload game archive
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: zunjie-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+          target: /tmp
+          overwrite: true
+          timeout: 60s
+          command_timeout: 2m
+
+      - name: Publish game to mounted wwwroot
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          RELEASE_ID: ${{ github.sha }}
+          ARCHIVE_NAME: zunjie-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: DEPLOY_PATH,RELEASE_ID,ARCHIVE_NAME
+          script: |
+            set -eu
+            : "${DEPLOY_PATH:=/home/work/myblogs}"
+            case "$RELEASE_ID" in
+              ''|*[!a-f0-9]*)
+                echo "Invalid release id." >&2
+                exit 1
+                ;;
+            esac
+
+            case "$DEPLOY_PATH" in
+              /*) ;;
+              *) echo "DEPLOY_PATH must be absolute." >&2; exit 1 ;;
+            esac
+            ARCHIVE="/tmp/$ARCHIVE_NAME"
+            STAGING=$(mktemp -d "/tmp/myblogs-zunjie-$RELEASE_ID.XXXXXX")
+            DESTINATION="$DEPLOY_PATH/appwwwroot/zunjie"
+            trap 'rm -rf "$STAGING" "$ARCHIVE"' EXIT
+
+            test -s "$ARCHIVE"
+            mkdir -p "$STAGING"
+            tar -xzf "$ARCHIVE" -C "$STAGING"
+            test -s "$STAGING/index.html"
+            test -s "$STAGING/app.js"
+            test -s "$STAGING/version.json"
+
+            sudo mkdir -p "$DESTINATION"
+            sudo rsync -rlt --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+              "$STAGING/" "$DESTINATION/"
+            test -s "$DESTINATION/index.html"
+            curl -fsSL --retry 3 --max-time 20 \
+              "https://hangyejiadao.vip/zunjie?release=$RELEASE_ID" | grep -Fq 'REDLINE'
+            for asset in app.js engine.js scene.js; do
+              headers=$(curl -fsSI --retry 3 --max-time 20 \
+                "https://hangyejiadao.vip/zunjie/$asset?v=$RELEASE_ID")
+              printf '%s\n' "$headers" | grep -iqE '^content-type: (text|application)/javascript'
+            done
+            curl -fsS --retry 3 --max-time 20 \
+              "https://hangyejiadao.vip/zunjie/version.json?release=$RELEASE_ID" \
+              | grep -Fq "\"commit\": \"$RELEASE_ID\""
+            echo "Redline game published to $DESTINATION"

@@ -12,9 +12,17 @@
 
 <img src="docs/screenshots/mobile.jpg" alt="REDLINE 刹车大师手机端运行截图" width="340" />
 
-## GitHub Pages
+## 网站集成与发布
 
-推送到 `main` 会通过 GitHub Actions 自动测试并部署。网站仅发布运行所需的 HTML、CSS、JavaScript 与图标；本地启动服务和测试文件保留在源码仓库中。
+游戏来源于 `bufan1024/redline-brake-game`，导入版本为 `796ef1598571b4b1ebcbc447fd0146e19b7810de`。
+
+本项目通过 `https://hangyejiadao.vip/zunjie` 访问游戏，目录请求会自动跳转到 `/zunjie/`。浏览器模块使用 `.js`，以兼容现有 ASP.NET Core 静态文件服务。
+
+推送 `zunjie/**` 的修改到 `master` 会触发主仓库的 `Deploy Redline Game` 工作流：运行物理测试，只发布 HTML、CSS、JavaScript、图标和版本信息到服务器 `$DEPLOY_PATH/appwwwroot/zunjie`。`DEPLOY_PATH` 默认 `/home/work/myblogs`，复用现有 `SERVER_HOST`、`SERVER_USER`、`SERVER_SSH_KEY` 和可选 `SERVER_PORT` Secrets。也可以在 Actions 页面手动运行。
+
+发布完成后工作流会校验页面和 JavaScript 模块的 HTTP 状态与 MIME 类型。版本信息位于 `/zunjie/version.json`。无需安装 Node.js 到线上服务器或重启后端。
+
+运行 `npm run build` 可生成 `_site/` 静态发布包，包内的资源引用带有版本参数，更新后会获取新资源。
 
 ## 启动
 

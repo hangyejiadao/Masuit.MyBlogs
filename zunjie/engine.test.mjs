@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BrakeGame } from './engine.mjs';
+import { BrakeGame } from './engine.js';
 
 const close = (actual, expected, tolerance = 1e-7) => {
   assert.ok(Math.abs(actual - expected) < tolerance, `${actual} ≈ ${expected}`);

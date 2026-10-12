@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/truelockmc/streambert",
+  "commit": "4afe564e5ea2565c96d6f2e61679c00fad2d498c",
+  "version": "2.6.0",
+  "license": "GPL-3.0",
+  "port": "Browser application for Masuit.MyBlogs at /vedio/"
+}

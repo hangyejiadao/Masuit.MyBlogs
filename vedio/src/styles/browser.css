@@ -1,0 +1,56 @@
+button, a, select, input { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.web-empty { padding: 60px 24px; text-align: center; display: flex; gap: 16px; flex-direction: column; align-items: center; }
+.web-muted, .web-token-note { color: var(--text3); line-height: 1.7; }
+.web-token-note { font-size: 12px; margin: 0 0 16px; }
+.web-media-hero { background-position: center; background-size: cover; padding: 28px 40px 40px; }
+.web-media-info { display: flex; align-items: center; gap: 32px; padding-top: 28px; }
+.web-poster { width: 180px; flex-shrink: 0; border-radius: 10px; }
+.web-media h1 { font-size: clamp(28px, 4vw, 54px); line-height: 1.15; margin-bottom: 14px; }
+.web-kicker { letter-spacing: 3px; color: var(--red); margin-bottom: 12px; font-size: 12px; font-weight: 600; }
+.web-overview { color: var(--text2); max-width: 800px; line-height: 1.8; margin: 18px 0; }
+.web-actions, .web-player-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.web-actions a, .web-help a { color: var(--text2); }
+.web-section { padding: 24px 40px; }
+.web-section h2 { font-size: 20px; margin-bottom: 16px; }
+.web-label { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.web-label select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 10px 12px; border-radius: 8px; max-width: 100%; }
+.web-episodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 16px; }
+.web-episode { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text2); cursor: pointer; }
+.web-episode.selected { border-color: var(--red); background: var(--red-dim); }
+.web-player { display: block; width: 100%; aspect-ratio: 16/9; border: 0; background: #000; border-radius: 8px; }
+.web-player-placeholder { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; aspect-ratio: 16/9; background: var(--surface); border-radius: 8px; color: var(--text3); }
+.web-player-placeholder svg { width: 48px; height: 48px; }
+.web-player-note { font-size: 12px; margin-top: 16px; }
+.web-section:fullscreen { background: #000; display: flex; flex-direction: column; justify-content: center; padding: 0; }
+.web-section:fullscreen .web-player { flex: 1; min-height: 0; }
+.web-section:fullscreen .web-player-note { display: none; }
+.web-recommendations { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+.web-settings { max-width: 960px; padding: 36px 40px; }
+.web-settings h1 { font-size: 32px; margin-bottom: 24px; }
+.web-settings section { padding: 24px 0; border-top: 1px solid var(--border); }
+.web-settings h2 { font-size: 20px; margin-bottom: 16px; }
+.web-settings p { margin-bottom: 16px; }
+.web-help { background: var(--surface2); border: 1px solid var(--border); padding: 28px; width: min(560px, calc(100vw - 32px)); border-radius: 12px; display: flex; flex-direction: column; gap: 18px; line-height: 1.7; }
+.apikey-box { max-width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.main { height: 100dvh; }
+@media (max-width: 640px) {
+  :root { --sidebar: 56px; }
+  .sidebar { padding: 12px 0; }
+  .sidebar-logo { width: 36px; height: 36px; }
+  .web-media-hero, .web-section, .web-settings { padding: 20px 16px; }
+  .web-media-info { gap: 16px; align-items: flex-start; }
+  .web-poster { display: none; }
+  .hero { height: 420px; }
+  .hero-content { padding: 24px 16px; }
+  .hero-title { font-size: 36px; }
+  .hero-overview { -webkit-line-clamp: 3; }
+  .section, .home-section, .library-section, .library-header { padding-left: 16px; padding-right: 16px; }
+  .search-modal { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .web-episodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .web-episode { padding: 12px; overflow-wrap: anywhere; }
+  .history-row { flex-wrap: wrap; }
+  .apikey-box { padding: 26px 20px; }
+  .web-player-toolbar { gap: 8px; }
+  .web-actions .btn { padding: 10px 12px; }
+}

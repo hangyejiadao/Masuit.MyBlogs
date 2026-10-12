@@ -23,6 +23,9 @@ publish/
 front/node_modules/
 front/dist/
 
+# Streambert is built and published separately as a static site.
+vedio/
+
 # Database dump (not needed to build the app)
 database/
 

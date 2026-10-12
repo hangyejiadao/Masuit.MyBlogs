@@ -18,6 +18,8 @@
 ## Star趋势  
 <img src="https://starchart.cc/ldqk/Masuit.MyBlogs.svg">    
 
+影视网页应用位于 [vedio/](vedio/README.md)，由 Streambert 移植，部署路径为 `/vedio/`。构建、使用与部署说明见该目录文档。
+
 ### 项目主要技术栈
 .NET 9  
 ASP.NET Core MVC + vue3 + Blazor Server  

@@ -1,0 +1,70 @@
+name: Deploy Streambert Web
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'vedio/**'
+      - '.github/workflows/deploy-vedio.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vedio
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/work/myblogs' }}
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vedio/package-lock.json
+      - name: Install and verify
+        working-directory: vedio
+        run: |
+          npm ci
+          npm test
+          npx playwright install --with-deps chromium
+          npm run test:browser
+          npm run build
+      - name: Package
+        run: tar -czf vedio-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz -C vedio/dist .
+      - name: Upload
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: vedio-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz,vedio/scripts/publish.sh
+          target: /tmp/myblogs-vedio-${{ github.run_id }}-${{ github.run_attempt }}
+          timeout: 60s
+          command_timeout: 2m
+      - name: Publish and verify
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          RELEASE: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: DEPLOY_PATH,RELEASE
+          script: |
+            set -eu
+            STAGING="/tmp/myblogs-vedio-$RELEASE"
+            bash "$STAGING/vedio/scripts/publish.sh" "$STAGING/vedio-$RELEASE.tar.gz" "$DEPLOY_PATH"
+            curl -fsSL --retry 3 --max-time 20 https://hangyejiadao.vip/vedio/ -o "$STAGING/live.html"
+            grep -Fq '/vedio/assets/' "$STAGING/live.html"
+            curl -fsS --retry 3 --max-time 20 "https://hangyejiadao.vip/vedio/version.json?release=$RELEASE" -o "$STAGING/live-version.json"
+            cmp "$DEPLOY_PATH/appwwwroot/vedio/version.json" "$STAGING/live-version.json"

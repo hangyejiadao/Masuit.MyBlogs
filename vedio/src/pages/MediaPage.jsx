@@ -131,9 +131,10 @@ export default function MediaPage({ item, apiKey, onBack, onSave, isSaved, onHis
           <a className="btn btn-ghost" href={url} target="_blank" rel="noopener noreferrer" onClick={() => { onHistory(media); setPlaying(false); }}>新窗口打开</a>
         </>}
       </div>
+      {/* Providers reject sandboxed embeds; use their standard cross-origin iframe. */}
       {playing ? <iframe key={url} ref={frame} className="web-player" src={url} title={`${media.title}${tv ? ` S${season}E${episode}` : ""} 播放器`}
         allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowFullScreen
-        sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" referrerPolicy="strict-origin-when-cross-origin" />
+        referrerPolicy="strict-origin-when-cross-origin" />
         : <div className="web-player-placeholder"><PlayIcon /><p>点击「播放」开始观看{tv ? ` S${season}E${episode}` : ""}</p></div>}
       <p className="web-muted web-player-note">第三方播放源的可用性由提供方决定。加载失败时请切换播放源或在新窗口打开。仅记录播放源主动提供的进度；浏览器无法读取跨站播放器。</p>
       {progress[key] > 0 && <p className="web-muted">已记录进度：{Math.round(progress[key])}%</p>}

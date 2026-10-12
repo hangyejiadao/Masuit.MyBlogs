@@ -83,6 +83,28 @@ test("TV season and episode selection updates player and stops the old episode",
   expect(overflow).toBe(false); expect(errors).toEqual([]);
   await page.screenshot({ path: `test-results/tv-${test.info().project.name}.png`, fullPage: true });
 });
+test("all player sources support the provider embed compatibility check", async ({ page }) => {
+  await start(page);
+  await page.route(/https:\/\/(player\.videasy\.to|vsembed\.su|www\.vidking\.net)\/.*/, route => route.fulfill({
+    contentType: "text/html", body: `<!doctype html><html><body>
+      <button id="check">Check player compatibility</button><p id="status">Waiting</p>
+      <script>
+        document.getElementById('check').onclick = () => {
+          const popup = window.open('about:blank', '_blank');
+          document.getElementById('status').textContent = popup ? 'Player ready' : 'Iframe Sandbox Detected';
+          if (popup) popup.close();
+        };
+      </script></body></html>`,
+  }));
+  await search(page, "Movie");
+  await page.getByRole("button", { name: "播放", exact: true }).click();
+  for (const source of ["videasy", "vidsrc", "vidking"]) {
+    await page.getByLabel("播放源", { exact: true }).selectOption(source);
+    const provider = page.frameLocator("iframe.web-player");
+    await provider.getByRole("button", { name: "Check player compatibility" }).click();
+    await expect(provider.locator("#status")).toHaveText("Player ready");
+  }
+});
 test("browser settings and backup export work without Electron", async ({ page }) => {
   await start(page);
   await page.locator('.sidebar-btn').filter({ hasText: "Settings" }).click();

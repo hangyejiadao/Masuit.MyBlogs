@@ -7,7 +7,6 @@ import {
   SearchIcon,
   HistoryIcon,
   FilmIcon,
-  SettingsIcon,
   DownloadsQueueIcon,
   QuitIcon,
   BackIcon,
@@ -214,12 +213,6 @@ export default function Sidebar({
           onClick={onShowShortcuts}
           icon={<HelpIcon />}
           label="Help & Shortcuts (?)"
-        />
-        <SideBtn
-          active={page === "settings"}
-          onClick={() => onNavigate("settings")}
-          icon={<SettingsIcon />}
-          label="Settings"
         />
         <button
           className="sidebar-btn"

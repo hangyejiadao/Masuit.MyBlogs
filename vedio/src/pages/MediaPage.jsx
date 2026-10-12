@@ -38,7 +38,7 @@ export default function MediaPage({ item, apiKey, onBack, onSave, isSaved, onHis
           setSeason(data.seasons?.find(value => value.season_number > 0)?.season_number ?? data.seasons?.[0]?.season_number ?? 1);
           setEpisode(1);
         }
-      }).catch(() => { if (active) setError("无法加载详情，请检查 Token 和网络后重试。"); });
+      }).catch(() => { if (active) setError("无法加载详情，请稍后重试；若持续失败，请联系管理员。"); });
     return () => { active = false; };
   }, [item.id, item.media_type, apiKey, revision]);
 
@@ -122,7 +122,7 @@ export default function MediaPage({ item, apiKey, onBack, onSave, isSaved, onHis
 
     <section className="web-section" ref={player}>
       <div className="web-player-toolbar">
-        <label className="web-label">播放源 <select aria-label="播放源" value={source} onChange={event => { setSource(event.target.value); storage.set("playerSource", event.target.value); }}>
+        <label className="web-label">播放源 <select aria-label="播放源" value={source} onChange={event => setSource(event.target.value)}>
           {PLAYER_SOURCES.map(value => <option key={value.id} value={value.id}>{value.label}</option>)}
         </select></label>
         {playing && <>

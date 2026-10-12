@@ -1,16 +1,12 @@
-const TMDB_BASE = "https://api.themoviedb.org/3";
+import { getManagedSetting } from "./siteConfig";
+const TMDB_BASE = "/api/vedio/tmdb";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 
 // ── TMDB metadata language ────────────────────────────────────────────────────
 // Read lazily from localStorage so it always reflects the current setting.
 // Falls back to "en-US".
 function getTmdbLanguage() {
-  try {
-    const raw = localStorage.getItem("streambert_tmdbLang");
-    return raw ? JSON.parse(raw) : "en-US";
-  } catch {
-    return "en-US";
-  }
+  return getManagedSetting("tmdbLang");
 }
 
 // Append the language query param to a TMDB path.
@@ -80,7 +76,6 @@ export const tmdbFetch = async (path, apiKey) => {
   let res;
   try {
     res = await fetch(`${TMDB_BASE}${localizedPath}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(15000),
     });
   } catch {
@@ -101,7 +96,12 @@ export const tmdbFetch = async (path, apiKey) => {
     throw new Error(`TMDB ${res.status}`);
   }
 
-  if (!res.ok) throw new Error(`TMDB ${res.status}`);
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    if (error.error === "tmdb_token_invalid" || error.error === "not_configured") _onAuthError?.();
+    else _onUnreachable?.();
+    throw new Error(`Metadata ${res.status}`);
+  }
   const data = await res.json();
   _tmdbCache.set(cacheKey, { data, expiresAt: Date.now() + TMDB_CACHE_TTL });
 

@@ -275,6 +275,12 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
         component: () => import("@/views/system/settings.vue"),
       },
       {
+        path: "vedio",
+        name: "system-vedio",
+        meta: { roles: ["admin"], title: "影视设置", icon: "movie" },
+        component: () => import("@/views/system/vedio.vue"),
+      },
+      {
         path: "menus",
         name: "菜单管理",
         meta: {

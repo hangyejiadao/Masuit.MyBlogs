@@ -2,8 +2,10 @@ import { test, expect } from "@playwright/test";
 
 const movie = { id: 123, title: "Test Movie", media_type: "movie", release_date: "2020-01-01", vote_average: 8, overview: "A test movie.", genre_ids: [18], poster_path: null };
 const tv = { id: 456, name: "Test Series", media_type: "tv", first_air_date: "2020-01-01", vote_average: 8, genre_ids: [18], poster_path: null };
+const config = { enabled: true, configured: true, language: "zh-CN", playerSource: "videasy", theme: "slate", accentColor: "blue", historyEnabled: true };
 async function mockApis(page) {
-  await page.route("https://api.themoviedb.org/3/**", async route => {
+  await page.route("**/api/vedio/config", route => route.fulfill({ json: config }));
+  await page.route("**/api/vedio/tmdb/**", async route => {
     const url = new URL(route.request().url());
     const pathname = url.pathname;
     let data = { results: [] };
@@ -11,8 +13,8 @@ async function mockApis(page) {
     else if (pathname.includes("/trending/movie")) data = { results: [movie] };
     else if (pathname.includes("/trending/tv")) data = { results: [tv] };
     else if (pathname.includes("/search/multi")) data = { results: url.searchParams.get("query").includes("Series") ? [tv] : [movie] };
-    else if (pathname === "/3/movie/123") data = { ...movie, genres: [{ name: "Drama" }], runtime: 120, videos: { results: [] }, recommendations: { results: [] }, credits: { cast: [] } };
-    else if (pathname === "/3/tv/456") data = { ...tv, genres: [], seasons: [{ season_number: 1, episode_count: 2, name: "Season 1" }, { season_number: 2, episode_count: 2, name: "Season 2" }], videos: { results: [] }, credits: { cast: [] } };
+    else if (pathname === "/api/vedio/tmdb/movie/123") data = { ...movie, genres: [{ name: "Drama" }], runtime: 120, videos: { results: [] }, recommendations: { results: [] }, credits: { cast: [] } };
+    else if (pathname === "/api/vedio/tmdb/tv/456") data = { ...tv, genres: [], seasons: [{ season_number: 1, episode_count: 2, name: "Season 1" }, { season_number: 2, episode_count: 2, name: "Season 2" }], videos: { results: [] }, credits: { cast: [] } };
     else if (pathname.includes("/tv/456/season/")) data = { episodes: [{ episode_number: 1, name: "First Episode" }, { episode_number: 2, name: "Second Episode" }] };
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
   });
@@ -23,7 +25,9 @@ async function mockApis(page) {
 async function start(page) {
   await mockApis(page);
   await page.addInitScript(() => {
-    if (!localStorage.getItem("streambert_apikey")) localStorage.setItem("streambert_apikey", JSON.stringify("test-token"));
+    localStorage.setItem("streambert_apikey", JSON.stringify("obsolete-token"));
+    localStorage.setItem("streambert_theme", JSON.stringify("light"));
+    localStorage.setItem("streambert_playerSource", JSON.stringify("vidking"));
   });
   await page.goto("/vedio/");
 }
@@ -32,16 +36,23 @@ async function search(page, query) {
   await page.locator(".search-input").fill(query);
   await page.locator(".search-result").first().click();
 }
-test("setup rejects invalid token and allows skipping without page errors", async ({ page }) => {
-  const errors = []; page.on("pageerror", error => errors.push(error.message));
-  await page.route("https://api.themoviedb.org/3/**", route => route.fulfill({ status: 401, contentType: "application/json", body: "{}" }));
+test("unconfigured service has no visitor token or settings controls", async ({ page }) => {
+  await page.route("**/api/vedio/config", route => route.fulfill({ json: { ...config, configured: false } }));
   await page.goto("/vedio/");
-  await page.getByLabel("TMDB Read Access Token", { exact: true }).fill("invalid-token");
-  await page.getByRole("button", { name: "Let's go" }).click();
-  await expect(page.locator(".apikey-error-title")).toContainText("Invalid token");
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await expect(page.getByText("填写 TMDB Read Access Token 后即可浏览和搜索影视。", { exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
+  await expect(page.getByText("影视服务尚未配置，请联系管理员。", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("TMDB Read Access Token", { exact: true })).toHaveCount(0);
+  await expect(page.locator('.sidebar-btn').filter({ hasText: "Settings" })).toHaveCount(0);
+});
+test("configuration failure can be retried", async ({ page }) => {
+  await mockApis(page);
+  let failed = true;
+  await page.route("**/api/vedio/config", route => failed ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: config }));
+  await page.goto("/vedio/");
+  await expect(page.getByText("无法获取影视配置，请稍后重试。", { exact: true })).toBeVisible();
+  failed = false;
+  await page.getByRole("button", { name: "重试", exact: true }).first().click();
+  await search(page, "Movie");
+  await expect(page.getByRole("heading", { name: "Test Movie", exact: true })).toBeVisible();
 });
 test("movie search, watchlist, playback progress and history persist after reload", async ({ page }) => {
   const errors = []; page.on("pageerror", error => errors.push(error.message));
@@ -105,15 +116,30 @@ test("all player sources support the provider embed compatibility check", async 
     await expect(provider.locator("#status")).toHaveText("Player ready");
   }
 });
-test("browser settings and backup export work without Electron", async ({ page }) => {
+test("server settings override legacy preferences and personal backups remain available", async ({ page }) => {
+  const requests = [];
+  page.on("request", request => { if (request.url().includes("/api/vedio/tmdb/")) requests.push(request); });
   await start(page);
-  await page.locator('.sidebar-btn').filter({ hasText: "Settings" }).click();
-  await page.getByLabel("影视资料语言").selectOption("zh-CN");
-  await page.getByLabel("主题", { exact: true }).selectOption("slate");
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("streambert_theme")))).toBe("slate");
+  await search(page, "Movie");
+  await expect(page.getByLabel("播放源", { exact: true })).toHaveValue("videasy");
+  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue("--red"))).toBe("#2563eb");
+  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue("--bg"))).not.toBe("#f5f5f5");
+  expect(requests.length).toBeGreaterThan(0);
+  for (const request of requests) {
+    expect(request.headers().authorization).toBeUndefined();
+    expect(new URL(request.url()).searchParams.get("language")).toBe("zh-CN");
+  }
+  await expect(page.locator('.sidebar-btn').filter({ hasText: "Settings" })).toHaveCount(0);
+  await page.locator('.sidebar-btn').filter({ hasText: "Library & History" }).click();
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出备份" }).click();
-  const download = await pending;
-  expect(download.suggestedFilename()).toBe("streambert-backup.json");
-  await expect(page.locator('a[href="/vedio/streambert-source.tar.gz"]')).toBeVisible();
+  expect((await pending).suggestedFilename()).toBe("streambert-backup.json");
+});
+test("disabled history is controlled by server configuration", async ({ page }) => {
+  await start(page);
+  await page.route("**/api/vedio/config", route => route.fulfill({ json: { ...config, historyEnabled: false } }));
+  await page.reload();
+  await search(page, "Movie");
+  await page.getByRole("button", { name: "播放", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("streambert_history")))).toEqual([]);
 });

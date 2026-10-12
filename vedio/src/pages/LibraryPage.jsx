@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import MediaCard from "../components/MediaCard";
+import LibraryBackup from "../components/LibraryBackup";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
@@ -57,6 +58,8 @@ export default function LibraryPage({
           Watch history, progress, and saved titles
         </div>
       </div>
+
+      <LibraryBackup />
 
       {inProgress.length > 0 && (
         <div className="library-section">

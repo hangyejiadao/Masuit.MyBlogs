@@ -1,9 +1,11 @@
 // localStorage-based persistence (works in both Vite dev and prod)
 
+import { isManagedSetting, getManagedSetting, metadataAvailable } from "./siteConfig";
 const PREFIX = "streambert_";
 
 export const storage = {
   get(key) {
+    if (isManagedSetting(key)) return getManagedSetting(key);
     try {
       const raw = localStorage.getItem(PREFIX + key);
       return raw ? JSON.parse(raw) : null;
@@ -12,6 +14,7 @@ export const storage = {
     }
   },
   set(key, value) {
+    if (isManagedSetting(key)) return;
     try {
       localStorage.setItem(PREFIX + key, JSON.stringify(value));
     } catch {}
@@ -100,7 +103,8 @@ export const STORAGE_KEYS = {
   GAMEPAD_ENABLED: "gamepadEnabled",
 };
 
-export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
+// Legacy component argument now represents availability, never a credential.
+export const getApiKey = () => metadataAvailable();
 
 // ── Source failover cache ────────────────────────────────────────────────────
 // AllManga doesn't always have every episode; rather than nag the user every

@@ -18,7 +18,6 @@ export const BACKUP_KEYS = [
   "homeViewMode",
   "startPage",
   // Player preferences
-  "playerSource",
   "allmangaDubMode",
   "introSkipMode",
   // Other Stuff
@@ -40,14 +39,11 @@ export const BACKUP_KEYS = [
   // Search history
   "searchHistory",
   // Appearance & behaviour
-  "accentColor",
   "fontSize",
   "compactMode",
   "reduceAnimations",
   "librarySort",
-  "historyEnabled",
   // TMDB metadata language (e.g. "de-DE")
-  "tmdbLang",
   // Notification preferences
   "notifyDownloadComplete",
   "notifyNewEpisode",

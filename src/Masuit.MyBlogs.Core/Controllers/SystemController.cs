@@ -178,7 +178,7 @@ public sealed class SystemController : AdminController
     /// <returns></returns>
     public ActionResult GetSettings()
     {
-        var list = CommonHelper.SystemSettings.Select(s => new
+        var list = CommonHelper.SystemSettings.Where(s => !s.Key.Item.StartsWith(VedioConfiguration.Prefix, StringComparison.Ordinal)).Select(s => new
         {
             Name = s.Key.Item,
             s.Value
@@ -193,6 +193,8 @@ public sealed class SystemController : AdminController
     /// <returns></returns>
     public async Task<ActionResult> Save([FromBody] List<SystemSetting> settings)
     {
+        if (settings.Any(item => item.Name?.StartsWith(VedioConfiguration.Prefix, StringComparison.OrdinalIgnoreCase) == true))
+            return ResultData(null, false, "影视配置请在影视设置页面保存。");
         var b = await SystemSettingService.AddOrUpdateSavedAsync(s => s.Name, settings) > 0;
         foreach (var item in settings)
         {
@@ -200,6 +202,41 @@ public sealed class SystemController : AdminController
         }
 
         return ResultData(null, b, b ? "设置保存成功！" : "设置保存失败！");
+    }
+
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public ActionResult GetVedioSettings()
+    {
+        var config = VedioConfiguration.Read(name => CommonHelper.SystemSettings[name]);
+        return ResultData(new
+        {
+            config.Enabled, config.HasToken, config.Language, config.PlayerSource,
+            config.Theme, config.AccentColor, config.HistoryEnabled
+        });
+    }
+
+    [HttpPost]
+    public async Task<ActionResult> SaveVedioSettings([FromBody] VedioSettingsCommand settings)
+    {
+        Response.Headers.CacheControl = "no-store";
+        var error = VedioConfiguration.Validate(settings);
+        if (error is not null) return ResultData(null, false, error);
+        var entries = new List<SystemSetting>
+        {
+            new() { Name = "VedioEnabled", Value = settings.Enabled.ToString().ToLowerInvariant() },
+            new() { Name = "VedioLanguage", Value = settings.Language },
+            new() { Name = "VedioPlayerSource", Value = settings.PlayerSource },
+            new() { Name = "VedioTheme", Value = settings.Theme },
+            new() { Name = "VedioAccentColor", Value = settings.AccentColor },
+            new() { Name = "VedioHistoryEnabled", Value = settings.HistoryEnabled.ToString().ToLowerInvariant() }
+        };
+        // A blank input preserves the credential; clearing it is an explicit admin operation.
+        if (settings.ClearToken || !string.IsNullOrWhiteSpace(settings.TmdbToken))
+            entries.Add(new SystemSetting { Name = "VedioTmdbToken", Value = settings.ClearToken ? "" : settings.TmdbToken.Trim() });
+        await SystemSettingService.AddOrUpdateSavedAsync(item => item.Name, entries);
+        foreach (var entry in entries) CommonHelper.SystemSettings[entry.Name] = entry.Value;
+        return ResultData(null, true, "影视设置保存成功。");
     }
 
     /// <summary>

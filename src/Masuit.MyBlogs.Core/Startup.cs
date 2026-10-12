@@ -105,6 +105,9 @@ public class Startup
         }); // 配置7z和断点续传和Redis和Lucene搜索引擎
 
         services.SetupHttpClients(Configuration);
+        services.AddSingleton<VedioMetadataCache>();
+        services.AddHttpClient("VedioTmdb", client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration);
         services.AddBundling().UseDefaults(_env).UseNUglify().EnableMinification().EnableChangeDetection().EnableCacheHeader(TimeSpan.FromHours(1));
         services.AddSingleton<IRedisClient>(new RedisClient(AppConfig.Redis)

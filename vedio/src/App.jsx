@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
-import SetupScreen from "./components/SetupScreen";
-import { storage, secureStorage } from "./utils/storage";
+import { storage } from "./utils/storage";
+import { loadSiteConfig } from "./utils/siteConfig";
 import { tmdbFetch, setApiErrorHandlers, clearTmdbCache } from "./utils/api";
 import { applyAccentColor, applyTheme } from "./utils/appearance";
 import { normalizeMedia, progressKey } from "./utils/browserPlayer";
@@ -11,7 +11,6 @@ import { normalizeMedia, progressKey } from "./utils/browserPlayer";
 const HomePage = lazy(() => import("./pages/HomePage"));
 const MediaPage = lazy(() => import("./pages/MediaPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function usePersistentState(key, fallback) {
   const [value, setValue] = useState(() => storage.get(key) ?? fallback);
@@ -22,7 +21,6 @@ function usePersistentState(key, fallback) {
 export default function App() {
   const [apiKey, setApiKey] = useState(null);
   const [ready, setReady] = useState(false);
-  const [skipped, setSkipped] = useState(false);
   const [status, setStatus] = useState(null);
   const [route, setRoute] = useState({ page: "home", item: null });
   const [stack, setStack] = useState([]);
@@ -39,10 +37,22 @@ export default function App() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [languageRevision, setLanguageRevision] = useState(0);
 
+  const refreshConfiguration = useCallback(async () => {
+    setLoading(true);
+    try {
+      const config = await loadSiteConfig();
+      clearTmdbCache();
+      applyAccentColor(config.accentColor);
+      applyTheme(config.theme);
+      setApiKey(config.enabled && config.configured);
+      setStatus(!config.enabled ? "disabled" : !config.configured ? "unconfigured" : null);
+      setLanguageRevision(value => value + 1);
+    } catch { setApiKey(false); setStatus("configuration"); }
+    finally { setReady(true); setLoading(false); }
+  }, []);
+
   useEffect(() => {
-    secureStorage.get("apikey").then(key => { setApiKey(key); setReady(true); });
-    applyAccentColor(storage.get("accentColor") || "red");
-    applyTheme(storage.get("theme") || "dark");
+    refreshConfiguration();
     const online = () => setOffline(false);
     const offline = () => setOffline(true);
     const languageChanged = () => setLanguageRevision(value => value + 1);
@@ -123,25 +133,16 @@ export default function App() {
   }, [setHistory]);
   const inProgress = history.map(item => ({ ...item, _pk: progressKey(item) }))
     .filter(item => !watched[item._pk] && progress[item._pk] > 2 && progress[item._pk] < 98);
-  const saveApiKey = async key => {
-    try {
-      await secureStorage.set("apikey", key);
-      clearTmdbCache(); setApiKey(key); setStatus(null);
-    } catch { setStatus("storage"); }
-  };
-  const changeApiKey = async () => { await secureStorage.set("apikey", ""); setApiKey(null); setSkipped(false); setStatus(null); };
 
   if (!ready) return <div className="web-empty">正在加载…</div>;
-  if (!apiKey && !skipped) return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
   return <ErrorBoundary>
     <Sidebar page={route.page} onNavigate={navigate} onSearch={() => setShowSearch(true)} savedList={savedList}
       onReorderSaved={setSavedOrder} onRemoveSaved={toggleSave} canGoBack={stack.length > 0} onBack={back}
       onShowShortcuts={() => setShowHelp(true)} />
     <main className="main">
       {(!apiKey || status) && <div className="api-status-banner api-status-warn" role="status">
-        <span>{!apiKey ? "填写 TMDB Read Access Token 后即可浏览和搜索影视。" : status === "invalid" ? "TMDB Token 无效或已失效，请重新填写。" : status === "storage" ? "无法保存 Token，请允许浏览器使用本地存储。" : "暂时无法连接 TMDB，请检查网络后重试。"}</span>
-        <button className="api-status-btn" onClick={changeApiKey}>填写 Token</button>
-        {apiKey && <button className="api-status-btn" onClick={() => { clearTmdbCache(); setLanguageRevision(value => value + 1); }}>重试</button>}
+        <span>{status === "disabled" ? "影视服务暂时关闭。" : status === "unconfigured" ? "影视服务尚未配置，请联系管理员。" : status === "configuration" ? "无法获取影视配置，请稍后重试。" : status === "invalid" ? "影视资料服务配置异常，请联系管理员。" : "暂时无法连接影视资料服务，请稍后重试。"}</span>
+        <button className="api-status-btn" onClick={refreshConfiguration}>重试</button>
       </div>}
       <Suspense fallback={<div className="web-empty">正在加载…</div>}>
         {route.page === "home" && <HomePage key={languageRevision} trending={trending} trendingTV={trendingTV} loading={loading}
@@ -154,7 +155,6 @@ export default function App() {
         {route.page === "history" && <LibraryPage history={history} inProgress={inProgress} saved={savedList} progress={progress}
           onSelect={select} watched={watched} onMarkWatched={markWatched} onMarkUnwatched={markUnwatched}
           onRemoveHistory={item => setHistory(previous => previous.filter(value => progressKey(value) !== progressKey(item)))} />}
-        {route.page === "settings" && <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />}
       </Suspense>
     </main>
     {showSearch && <SearchModal apiKey={apiKey} offline={offline} onSelect={select} onClose={() => setShowSearch(false)} />}
@@ -162,7 +162,7 @@ export default function App() {
       <div className="web-help" role="dialog" aria-modal="true" aria-label="使用帮助">
         <h2>Streambert 网页版</h2>
         <p>Ctrl / ⌘ + F 搜索 · Ctrl / ⌘ + Z 返回 · Esc 关闭弹窗。</p>
-        <p>收藏、历史和 Token 保存在此浏览器。播放器由第三方提供，无法加载时可切换播放源或在新窗口打开。</p>
+        <p>收藏和历史保存在此浏览器，影视配置由网站统一管理。播放器由第三方提供，无法加载时可切换播放源或在新窗口打开。</p>
         <p>网页版不提供桌面端的多线程下载、AllManga 抓取、广告拦截和跨站视频控制。仅保存播放源主动提供的观看进度，也可手动标记已看。</p>
         <a href={import.meta.env.BASE_URL + "streambert-source.tar.gz"}>下载此版本源码（GPL-3.0）</a>
         <button className="btn btn-primary" onClick={() => setShowHelp(false)}>关闭</button>

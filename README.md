@@ -90,6 +90,7 @@ Redis：Redis 8.x
 #### 系统设置
 - 包含系统的全局设置、防火墙管理、网站运行日志记录、友链管理、邮件模板的管理。
 - 全局设置：网站的一些基本配置和SEO相关操作等；
+- 影视设置：在 `/dashboard/system/vedio` 管理 `/vedio/` 的 TMDB Token、语言、播放源、主题和历史开关。前台通过 `/api/vedio/config` 获取配置，影视资料由后端转发，Token 不返回访客。
 - 防火墙：对网站的所有请求进行全局流量的拦截，让规则内的请求阻止掉，支持黑名单、白名单、IP地址段、国家或地区、关键词审查等规则；
 - 模板变量：针对文章内容的通用内容生成，变量只能添加不能删除。
 <img width="1781" height="1851" alt="image" src="https://github.com/user-attachments/assets/ee8f7458-38e4-4006-9257-99774570c9f9" />

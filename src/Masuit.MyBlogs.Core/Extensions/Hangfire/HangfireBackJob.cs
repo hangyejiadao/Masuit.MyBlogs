@@ -33,6 +33,47 @@ public sealed class HangfireBackJob : Disposable, IHangfireBackJob
     }
 
     /// <summary>
+    /// 授权到期提醒：扫描 30 天内到期的授权，在到期前 30/15/7/1 天及到期当天给客户发邮件，
+    /// 每个档位只发一次（记录在授权的 LastReminderStage 上，续期后自动重置）。
+    /// </summary>
+    public async Task SendLicenseExpiryReminders()
+    {
+        var licenseService = _serviceScope.ServiceProvider.GetRequiredService<IAppLicenseService>();
+        var today = DateTime.Today;
+        var thresholds = new[] { 30, 15, 7, 1, 0 };
+        var licenses = licenseService.GetQuery(l => (l.Status == Status.Available || l.Status == Status.Default) && l.ExpireDate >= today && l.ExpireDate < today.AddDays(31)).Include(l => l.Application).Include(l => l.Customer).ToList();
+        foreach (var license in licenses)
+        {
+            var days = (license.ExpireDate.Date - today).Days;
+            if (!thresholds.Contains(days) || license.LastReminderStage == days)
+            {
+                continue;
+            }
+
+            var email = license.Customer?.Email;
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                LogManager.Info($"授权到期提醒跳过：授权 {license.LicenseKey} 的客户未填写邮箱");
+                continue;
+            }
+
+            try
+            {
+                var (title, content) = LicenseReminderMail.Build(license, days);
+                await _mailSender.Send(title, content, email, "127.0.0.1");
+                license.LastReminderStage = days;
+                license.LastReminderAt = DateTime.Now;
+                await licenseService.SaveChangesAsync();
+                LogManager.Info($"授权到期提醒已发送：{license.LicenseKey}，客户 {license.Customer?.Name}，剩余 {days} 天");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Info($"授权到期提醒发送失败：{license.LicenseKey}，{ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Retain only the latest 10,000 HTTP request logs.
     /// </summary>
     public async Task CleanupHttpRequestLogs()

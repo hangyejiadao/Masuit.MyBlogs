@@ -14,6 +14,12 @@ public partial interface ILoginRecordService : IBaseService<LoginRecord>;
 
 public partial interface IExternalLoginService : IBaseService<ExternalLogin>;
 
+public partial interface ICustomerService : IBaseService<Customer>;
+
+public partial interface IApplicationInfoService : IBaseService<ApplicationInfo>;
+
+public partial interface IAppLicenseService : IBaseService<AppLicense>;
+
 public partial interface IMiscService : IBaseService<Misc>;
 
 public partial interface INoticeService : IBaseService<Notice>;

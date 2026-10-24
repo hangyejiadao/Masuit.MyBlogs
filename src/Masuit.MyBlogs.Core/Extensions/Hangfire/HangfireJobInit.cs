@@ -25,6 +25,10 @@ public static class HangfireJobInit
         RecurringJob.AddOrUpdate<IHangfireBackJob>("EverymonthJob", job => job.EverymonthJob(), Cron.Monthly(1, 0, 0)); //每月的任务
         RecurringJob.AddOrUpdate<IHangfireBackJob>("StatisticsSearchKeywords", job => job.StatisticsSearchKeywords(), Cron.Hourly); //每小时的任务
         RecurringJob.AddOrUpdate<IHangfireBackJob>(nameof(IHangfireBackJob.CleanupHttpRequestLogs), job => job.CleanupHttpRequestLogs(), Cron.Minutely);
+        RecurringJob.AddOrUpdate<IHangfireBackJob>(nameof(IHangfireBackJob.SendLicenseExpiryReminders), job => job.SendLicenseExpiryReminders(), Cron.Daily(9), new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        }); //每天9点检查授权到期并给客户发提醒邮件
         BackgroundJob.Enqueue<IHangfireBackJob>(job => job.CleanupHttpRequestLogs());
         BackgroundJob.Enqueue<IHangfireBackJob>(job => job.StatisticsSearchKeywords());
     }

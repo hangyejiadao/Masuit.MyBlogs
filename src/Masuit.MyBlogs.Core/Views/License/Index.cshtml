@@ -1,0 +1,140 @@
+@using Masuit.MyBlogs.Core.Models.Entity
+@model List<Masuit.MyBlogs.Core.Models.Entity.AppLicense>
+@{
+  ViewBag.Title = "授权管理";
+  Layout = "~/Views/Shared/_Layout.cshtml";
+  var apps = ViewBag.Applications as List<ApplicationInfo> ?? new List<ApplicationInfo>();
+  var customers = ViewBag.Customers as List<Customer> ?? new List<Customer>();
+  var editorData = Model.Select(l => new
+  {
+    id = l.Id,
+    applicationInfoId = l.ApplicationInfoId,
+    customerId = l.CustomerId,
+    licenseKey = l.LicenseKey,
+    startDate = l.StartDate.ToString("yyyy-MM-dd"),
+    expireDate = l.ExpireDate.ToString("yyyy-MM-dd"),
+    remark = l.Remark ?? ""
+  });
+}
+<style>
+  .lic-nav { display:flex; gap:10px; margin:14px 0; }
+  .lic-nav a { padding:6px 16px; border-radius:16px; background:#eef4fb; color:#1566b6; text-decoration:none; }
+  .lic-nav a.active { background:#1566b6; color:#fff; }
+  .lic-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#f8fafc; border:1px solid #e3eaf2; border-radius:10px; padding:14px; margin-bottom:16px; }
+  .lic-form .field { display:flex; flex-direction:column; gap:4px; }
+  .lic-form label { font-size:.85rem; color:#555; }
+  .lic-form input, .lic-form select { padding:7px 9px; border:1px solid #ccd6e0; border-radius:6px; min-height:36px; }
+  .lic-btn { padding:8px 18px; border:none; border-radius:6px; background:#1566b6; color:#fff; cursor:pointer; min-height:36px; }
+  .lic-btn.gray { background:#8a97a5; }
+  .lic-table { width:100%; border-collapse:collapse; }
+  .lic-table th, .lic-table td { border-bottom:1px solid #e3eaf2; padding:9px 8px; text-align:left; font-size:.95rem; }
+  .lic-table th { background:#f2f6fa; }
+  .badge { padding:2px 10px; border-radius:10px; font-size:.85rem; }
+  .badge.ok { background:#e5f6ec; color:#1c7c43; }
+  .badge.warn { background:#fff3e0; color:#b26a00; }
+  .badge.exp { background:#fde8e8; color:#c0392b; }
+  .op-btn { color:#1566b6; cursor:pointer; margin-right:10px; white-space:nowrap; }
+  .key { font-family:Consolas,monospace; font-size:.88rem; }
+</style>
+<div class="container min-height610">
+  <ol class="breadcrumb">
+    <li><a asp-action="Index" asp-controller="Home">首页</a></li>
+    <li class="current"><em>@ViewBag.Title</em></li>
+  </ol>
+  <div class="lic-nav">
+    <a class="active" href="/License/Index">授权管理</a>
+    <a href="/License/Applications">应用管理</a>
+    <a href="/License/Customers">客户管理</a>
+  </div>
+  @if (apps.Count == 0 || customers.Count == 0) {
+    <p style="color:#b26a00;">提示：签发授权前需要先在「应用管理」和「客户管理」中建好应用与客户。</p>
+  }
+  <div class="lic-form">
+    <input id="licId" type="hidden" value="0">
+    <div class="field"><label>应用</label>
+      <select id="licApp">
+        @foreach (var a in apps) { <option value="@a.Id">@a.Name</option> }
+      </select>
+    </div>
+    <div class="field"><label>客户</label>
+      <select id="licCustomer">
+        @foreach (var c in customers) { <option value="@c.Id">@c.Name</option> }
+      </select>
+    </div>
+    <div class="field"><label>授权码（留空自动生成）</label><input id="licKey" placeholder="LIC-XXXXXX-…" style="width:230px;" type="text"></div>
+    <div class="field"><label>生效日期</label><input id="licStart" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label>到期日期</label><input id="licExpire" type="date" value="@DateTime.Today.AddYears(1).ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label>备注</label><input id="licRemark" style="width:160px;" type="text"></div>
+    <button class="lic-btn" onclick="saveLicense()">保存授权</button>
+    <button class="lic-btn gray" onclick="resetForm()">新建</button>
+  </div>
+  <table class="lic-table">
+    <thead><tr><th>应用</th><th>客户</th><th>授权码</th><th>生效</th><th>到期</th><th>状态</th><th>上次提醒</th><th>操作</th></tr></thead>
+    <tbody>
+    @foreach (var l in Model) {
+      var days = (l.ExpireDate.Date - DateTime.Today).Days;
+      <tr>
+        <td>@l.Application?.Name</td>
+        <td>@l.Customer?.Name</td>
+        <td class="key">@l.LicenseKey</td>
+        <td>@l.StartDate.ToString("yyyy-MM-dd")</td>
+        <td>@l.ExpireDate.ToString("yyyy-MM-dd")</td>
+        <td>
+          @if (days < 0) { <span class="badge exp">已过期 @(-days) 天</span> }
+          else if (days <= 30) { <span class="badge warn">剩 @days 天</span> }
+          else { <span class="badge ok">正常（剩 @days 天）</span> }
+        </td>
+        <td>@(l.LastReminderAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+        <td>
+          <a class="op-btn" onclick="editLicense(@l.Id)">编辑</a>
+          <a class="op-btn" onclick="renewLicense(@l.Id)">续期1年</a>
+          <a class="op-btn" onclick="remindNow(@l.Id)">立即提醒</a>
+          <a class="op-btn" onclick="delLicense(@l.Id, '@l.LicenseKey')">删除</a>
+        </td>
+      </tr>
+    }
+    @if (Model.Count == 0) {
+      <tr><td colspan="8" style="color:#888;">暂无授权记录，使用上方表单签发第一份授权。</td></tr>
+    }
+    </tbody>
+  </table>
+</div>
+<script>
+  const licenses = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(editorData));
+  const $ = id => document.getElementById(id);
+  async function postJson(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return res.json();
+  }
+  async function doPost(url, body) {
+    const data = await postJson(url, body);
+    if (data && data.Success) { alert(data.Message || '操作成功'); location.reload(); }
+    else alert((data && data.Message) || '操作失败');
+  }
+  function resetForm() {
+    $('licId').value = 0; $('licKey').value = ''; $('licRemark').value = '';
+    $('licStart').value = '@DateTime.Today.ToString("yyyy-MM-dd")';
+    $('licExpire').value = '@DateTime.Today.AddYears(1).ToString("yyyy-MM-dd")';
+  }
+  function editLicense(id) {
+    const l = licenses.find(x => x.id === id);
+    if (!l) return;
+    $('licId').value = l.id; $('licApp').value = l.applicationInfoId; $('licCustomer').value = l.customerId;
+    $('licKey').value = l.licenseKey; $('licStart').value = l.startDate; $('licExpire').value = l.expireDate; $('licRemark').value = l.remark;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function saveLicense() {
+    doPost('/License/SaveLicense', {
+      id: parseInt($('licId').value) || 0,
+      applicationInfoId: parseInt($('licApp').value) || 0,
+      customerId: parseInt($('licCustomer').value) || 0,
+      licenseKey: $('licKey').value.trim(),
+      startDate: $('licStart').value,
+      expireDate: $('licExpire').value,
+      remark: $('licRemark').value.trim()
+    });
+  }
+  function renewLicense(id) { if (confirm('确定要给该授权续期 1 年吗？')) doPost('/License/RenewLicense', { id, months: 12 }); }
+  function remindNow(id) { if (confirm('确定立即给该客户发送到期提醒邮件吗？')) doPost('/License/SendReminderNow', { id }); }
+  function delLicense(id, key) { if (confirm('确定要删除授权 ' + key + ' 吗？')) doPost('/License/DeleteLicense', { id }); }
+</script>

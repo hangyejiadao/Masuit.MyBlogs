@@ -26,6 +26,12 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<UserInfo>().HasMany(e => e.ExternalLogins).WithOne(e => e.UserInfo).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ExternalLogin>().HasIndex(e => new { e.Provider, e.ProviderKey }).IsUnique();
 
+        modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.Licenses).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ApplicationInfo>().HasIndex(e => e.AppKey).IsUnique();
+        modelBuilder.Entity<Customer>().HasMany(e => e.Licenses).WithOne(e => e.Customer).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
+        modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
+
         modelBuilder.Entity<Menu>().HasMany(e => e.Children).WithOne(m => m.Parent).IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Menu>().Property(c => c.Path).IsRequired();
         modelBuilder.Entity<Menu>().Navigation(p => p.Children).EnableLazyLoading(false);
@@ -149,6 +155,12 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<LoginRecord> LoginRecord { get; set; }
 
     public virtual DbSet<ExternalLogin> ExternalLogin { get; set; }
+
+    public virtual DbSet<Customer> Customer { get; set; }
+
+    public virtual DbSet<ApplicationInfo> ApplicationInfo { get; set; }
+
+    public virtual DbSet<AppLicense> AppLicense { get; set; }
 
     public virtual DbSet<Donate> Donate { get; set; }
 

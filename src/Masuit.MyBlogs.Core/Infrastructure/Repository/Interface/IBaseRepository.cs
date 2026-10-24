@@ -336,3 +336,9 @@ public partial interface IPostTagsRepository : IBaseRepository<PostTag>;
 public partial interface IEmailBlocklistRepository : IBaseRepository<EmailBlocklist>;
 
 public partial interface IExternalLoginRepository : IBaseRepository<ExternalLogin>;
+
+public partial interface ICustomerRepository : IBaseRepository<Customer>;
+
+public partial interface IApplicationInfoRepository : IBaseRepository<ApplicationInfo>;
+
+public partial interface IAppLicenseRepository : IBaseRepository<AppLicense>;

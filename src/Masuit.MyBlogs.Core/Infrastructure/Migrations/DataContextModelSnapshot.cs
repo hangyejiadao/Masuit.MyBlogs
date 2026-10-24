@@ -189,6 +189,91 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("AdvertisementClickRecord");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppLicense", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ApplicationInfoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ExpireDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("LastReminderAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("LastReminderStage")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LicenseKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationInfoId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ExpireDate");
+
+                    b.HasIndex("LicenseKey")
+                        .IsUnique();
+
+                    b.ToTable("AppLicense");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AppKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppKey")
+                        .IsUnique();
+
+                    b.ToTable("ApplicationInfo");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
                 {
                     b.Property<int>("Id")
@@ -292,6 +377,43 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.HasIndex("PostId");
 
                     b.ToTable("Comment");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Customer");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Donate", b =>
@@ -1251,6 +1373,25 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppLicense", b =>
+                {
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", "Application")
+                        .WithMany("Licenses")
+                        .HasForeignKey("ApplicationInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.Customer", "Customer")
+                        .WithMany("Licenses")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
                 {
                     b.HasOne("Masuit.MyBlogs.Core.Models.Entity.Category", "Parent")
@@ -1425,6 +1566,11 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.Navigation("ClickRecords");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", b =>
+                {
+                    b.Navigation("Licenses");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
                 {
                     b.Navigation("Children");
@@ -1437,6 +1583,11 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Comment", b =>
                 {
                     b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Customer", b =>
+                {
+                    b.Navigation("Licenses");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.LeaveMessage", b =>

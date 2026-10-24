@@ -45,3 +45,9 @@ public sealed partial class PostTagsRepository : BaseRepository<PostTag>, IPostT
 public sealed partial class EmailBlocklistRepository : BaseRepository<EmailBlocklist>, IEmailBlocklistRepository;
 
 public sealed partial class ExternalLoginRepository : BaseRepository<ExternalLogin>, IExternalLoginRepository;
+
+public sealed partial class CustomerRepository : BaseRepository<Customer>, ICustomerRepository;
+
+public sealed partial class ApplicationInfoRepository : BaseRepository<ApplicationInfo>, IApplicationInfoRepository;
+
+public sealed partial class AppLicenseRepository : BaseRepository<AppLicense>, IAppLicenseRepository;

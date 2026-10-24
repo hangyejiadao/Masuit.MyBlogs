@@ -1,0 +1,95 @@
+@model List<Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo>
+@{
+  ViewBag.Title = "应用管理";
+  Layout = "~/Views/Shared/_Layout.cshtml";
+  var editorData = Model.Select(a => new
+  {
+    id = a.Id,
+    name = a.Name,
+    appKey = a.AppKey,
+    description = a.Description ?? ""
+  });
+}
+<style>
+  .lic-nav { display:flex; gap:10px; margin:14px 0; }
+  .lic-nav a { padding:6px 16px; border-radius:16px; background:#eef4fb; color:#1566b6; text-decoration:none; }
+  .lic-nav a.active { background:#1566b6; color:#fff; }
+  .lic-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#f8fafc; border:1px solid #e3eaf2; border-radius:10px; padding:14px; margin-bottom:16px; }
+  .lic-form .field { display:flex; flex-direction:column; gap:4px; }
+  .lic-form label { font-size:.85rem; color:#555; }
+  .lic-form input { padding:7px 9px; border:1px solid #ccd6e0; border-radius:6px; min-height:36px; }
+  .lic-btn { padding:8px 18px; border:none; border-radius:6px; background:#1566b6; color:#fff; cursor:pointer; min-height:36px; }
+  .lic-btn.gray { background:#8a97a5; }
+  .lic-table { width:100%; border-collapse:collapse; }
+  .lic-table th, .lic-table td { border-bottom:1px solid #e3eaf2; padding:9px 8px; text-align:left; font-size:.95rem; }
+  .lic-table th { background:#f2f6fa; }
+  .op-btn { color:#1566b6; cursor:pointer; margin-right:10px; white-space:nowrap; }
+</style>
+<div class="container min-height610">
+  <ol class="breadcrumb">
+    <li><a asp-action="Index" asp-controller="Home">首页</a></li>
+    <li class="current"><em>@ViewBag.Title</em></li>
+  </ol>
+  <div class="lic-nav">
+    <a href="/License/Index">授权管理</a>
+    <a class="active" href="/License/Applications">应用管理</a>
+    <a href="/License/Customers">客户管理</a>
+  </div>
+  <div class="lic-form">
+    <input id="appId" type="hidden" value="0">
+    <div class="field"><label>应用名称</label><input id="appName" style="width:200px;" type="text"></div>
+    <div class="field"><label>应用标识（留空自动生成）</label><input id="appKey" placeholder="如 order-system" style="width:200px;" type="text"></div>
+    <div class="field"><label>应用说明</label><input id="appDesc" style="width:260px;" type="text"></div>
+    <button class="lic-btn" onclick="saveApp()">保存应用</button>
+    <button class="lic-btn gray" onclick="resetForm()">新建</button>
+  </div>
+  <table class="lic-table">
+    <thead><tr><th>应用名称</th><th>应用标识</th><th>说明</th><th>授权数</th><th>操作</th></tr></thead>
+    <tbody>
+    @foreach (var a in Model) {
+      <tr>
+        <td>@a.Name</td>
+        <td>@a.AppKey</td>
+        <td>@a.Description</td>
+        <td>@(a.Licenses?.Count ?? 0)</td>
+        <td>
+          <a class="op-btn" onclick="editApp(@a.Id)">编辑</a>
+          <a class="op-btn" onclick="delApp(@a.Id, '@a.Name')">删除</a>
+        </td>
+      </tr>
+    }
+    @if (Model.Count == 0) {
+      <tr><td colspan="5" style="color:#888;">暂无应用，使用上方表单添加第一个应用。</td></tr>
+    }
+    </tbody>
+  </table>
+</div>
+<script>
+  const apps = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(editorData));
+  const $ = id => document.getElementById(id);
+  async function postJson(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return res.json();
+  }
+  async function doPost(url, body) {
+    const data = await postJson(url, body);
+    if (data && data.Success) { alert(data.Message || '操作成功'); location.reload(); }
+    else alert((data && data.Message) || '操作失败');
+  }
+  function resetForm() { $('appId').value = 0; $('appName').value = ''; $('appKey').value = ''; $('appDesc').value = ''; }
+  function editApp(id) {
+    const a = apps.find(x => x.id === id);
+    if (!a) return;
+    $('appId').value = a.id; $('appName').value = a.name; $('appKey').value = a.appKey; $('appDesc').value = a.description;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function saveApp() {
+    doPost('/License/SaveApplication', {
+      id: parseInt($('appId').value) || 0,
+      name: $('appName').value.trim(),
+      appKey: $('appKey').value.trim(),
+      description: $('appDesc').value.trim()
+    });
+  }
+  function delApp(id, name) { if (confirm('确定要删除应用 ' + name + ' 吗？')) doPost('/License/DeleteApplication', { id }); }
+</script>

@@ -1,0 +1,106 @@
+@model List<Masuit.MyBlogs.Core.Models.Entity.Customer>
+@{
+  ViewBag.Title = "客户管理";
+  Layout = "~/Views/Shared/_Layout.cshtml";
+  var editorData = Model.Select(c => new
+  {
+    id = c.Id,
+    name = c.Name,
+    contactName = c.ContactName ?? "",
+    email = c.Email ?? "",
+    phone = c.Phone ?? "",
+    remark = c.Remark ?? ""
+  });
+}
+<style>
+  .lic-nav { display:flex; gap:10px; margin:14px 0; }
+  .lic-nav a { padding:6px 16px; border-radius:16px; background:#eef4fb; color:#1566b6; text-decoration:none; }
+  .lic-nav a.active { background:#1566b6; color:#fff; }
+  .lic-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#f8fafc; border:1px solid #e3eaf2; border-radius:10px; padding:14px; margin-bottom:16px; }
+  .lic-form .field { display:flex; flex-direction:column; gap:4px; }
+  .lic-form label { font-size:.85rem; color:#555; }
+  .lic-form input { padding:7px 9px; border:1px solid #ccd6e0; border-radius:6px; min-height:36px; }
+  .lic-btn { padding:8px 18px; border:none; border-radius:6px; background:#1566b6; color:#fff; cursor:pointer; min-height:36px; }
+  .lic-btn.gray { background:#8a97a5; }
+  .lic-table { width:100%; border-collapse:collapse; }
+  .lic-table th, .lic-table td { border-bottom:1px solid #e3eaf2; padding:9px 8px; text-align:left; font-size:.95rem; }
+  .lic-table th { background:#f2f6fa; }
+  .op-btn { color:#1566b6; cursor:pointer; margin-right:10px; white-space:nowrap; }
+</style>
+<div class="container min-height610">
+  <ol class="breadcrumb">
+    <li><a asp-action="Index" asp-controller="Home">首页</a></li>
+    <li class="current"><em>@ViewBag.Title</em></li>
+  </ol>
+  <div class="lic-nav">
+    <a href="/License/Index">授权管理</a>
+    <a href="/License/Applications">应用管理</a>
+    <a class="active" href="/License/Customers">客户管理</a>
+  </div>
+  <div class="lic-form">
+    <input id="custId" type="hidden" value="0">
+    <div class="field"><label>客户名称</label><input id="custName" style="width:180px;" type="text"></div>
+    <div class="field"><label>联系人</label><input id="custContact" style="width:120px;" type="text"></div>
+    <div class="field"><label>邮箱（接收到期提醒）</label><input id="custEmail" style="width:220px;" type="email"></div>
+    <div class="field"><label>电话</label><input id="custPhone" style="width:140px;" type="text"></div>
+    <div class="field"><label>备注</label><input id="custRemark" style="width:160px;" type="text"></div>
+    <button class="lic-btn" onclick="saveCustomer()">保存客户</button>
+    <button class="lic-btn gray" onclick="resetForm()">新建</button>
+  </div>
+  <table class="lic-table">
+    <thead><tr><th>客户名称</th><th>联系人</th><th>邮箱</th><th>电话</th><th>授权数</th><th>操作</th></tr></thead>
+    <tbody>
+    @foreach (var c in Model) {
+      <tr>
+        <td>@c.Name</td>
+        <td>@c.ContactName</td>
+        <td>@c.Email</td>
+        <td>@c.Phone</td>
+        <td>@(c.Licenses?.Count ?? 0)</td>
+        <td>
+          <a class="op-btn" onclick="editCustomer(@c.Id)">编辑</a>
+          <a class="op-btn" onclick="delCustomer(@c.Id, '@c.Name')">删除</a>
+        </td>
+      </tr>
+    }
+    @if (Model.Count == 0) {
+      <tr><td colspan="6" style="color:#888;">暂无客户，使用上方表单添加第一个客户。</td></tr>
+    }
+    </tbody>
+  </table>
+</div>
+<script>
+  const customers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(editorData));
+  const $ = id => document.getElementById(id);
+  async function postJson(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return res.json();
+  }
+  async function doPost(url, body) {
+    const data = await postJson(url, body);
+    if (data && data.Success) { alert(data.Message || '操作成功'); location.reload(); }
+    else alert((data && data.Message) || '操作失败');
+  }
+  function resetForm() {
+    $('custId').value = 0; $('custName').value = ''; $('custContact').value = '';
+    $('custEmail').value = ''; $('custPhone').value = ''; $('custRemark').value = '';
+  }
+  function editCustomer(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    $('custId').value = c.id; $('custName').value = c.name; $('custContact').value = c.contactName;
+    $('custEmail').value = c.email; $('custPhone').value = c.phone; $('custRemark').value = c.remark;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function saveCustomer() {
+    doPost('/License/SaveCustomer', {
+      id: parseInt($('custId').value) || 0,
+      name: $('custName').value.trim(),
+      contactName: $('custContact').value.trim(),
+      email: $('custEmail').value.trim(),
+      phone: $('custPhone').value.trim(),
+      remark: $('custRemark').value.trim()
+    });
+  }
+  function delCustomer(id, name) { if (confirm('确定要删除客户 ' + name + ' 吗？')) doPost('/License/DeleteCustomer', { id }); }
+</script>

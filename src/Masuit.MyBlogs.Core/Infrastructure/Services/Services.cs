@@ -15,6 +15,8 @@ public sealed partial class LinkLoopbackService(IBaseRepository<LinkLoopback> re
 
 public sealed partial class LoginRecordService(IBaseRepository<LoginRecord> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<LoginRecord>(repository, searchEngine, searcher), ILoginRecordService;
 
+public sealed partial class ExternalLoginService(IBaseRepository<ExternalLogin> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<ExternalLogin>(repository, searchEngine, searcher), IExternalLoginService;
+
 public sealed partial class MiscService(IBaseRepository<Misc> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Misc>(repository, searchEngine, searcher), IMiscService;
 
 public sealed partial class NoticeService(IBaseRepository<Notice> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Notice>(repository, searchEngine, searcher), INoticeService;

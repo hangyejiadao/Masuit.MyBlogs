@@ -54,6 +54,7 @@ public class Startup
             AppConfig.Redis = configuration[nameof(AppConfig.Redis)];
             AppConfig.TrueClientIPHeader = configuration[nameof(AppConfig.TrueClientIPHeader)] ?? "CF-Connecting-IP";
             AppConfig.EnableIPDirect = bool.Parse(configuration[nameof(AppConfig.EnableIPDirect)] ?? "false");
+            configuration.Bind("OAuth", AppConfig.OAuth);
             configuration.Bind("Imgbed:Gitlabs", AppConfig.GitlabConfigs);
             configuration.AddToMasuitTools();
         }
@@ -91,6 +92,7 @@ public class Startup
             options.RedirectStatusCode = StatusCodes.Status301MovedPermanently;
         });
         services.AddSession().AddAntiforgery(); //注入Session
+        services.AddExternalLoginAuthentication(Configuration); //第三方单点登录（GitHub / Google），凭据未配置时自动禁用
         services.AddResponseCache();
         services.AddHangfireServer().AddHangfire((serviceProvider, configuration) =>
         {
@@ -181,6 +183,7 @@ public class Startup
 #if DEBUG
         app.UseCors("AllowAny");
 #endif
+        app.UseAuthentication();
         app.UseRouting().UseBodyOrDefaultModelBinder().UseEndpoints(endpoints =>
         {
             endpoints.MapBlazorHub(options =>

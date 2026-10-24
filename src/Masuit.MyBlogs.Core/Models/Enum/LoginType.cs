@@ -8,5 +8,7 @@ public enum LoginType
 	Default,
 	QQ,
 	Wechat,
-	WeBlog
+	WeBlog,
+	GitHub,
+	Google
 }

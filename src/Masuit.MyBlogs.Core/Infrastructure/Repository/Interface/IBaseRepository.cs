@@ -334,3 +334,5 @@ public partial interface IPostVisitRecordStatsRepository : IBaseRepository<PostV
 public partial interface IPostTagsRepository : IBaseRepository<PostTag>;
 
 public partial interface IEmailBlocklistRepository : IBaseRepository<EmailBlocklist>;
+
+public partial interface IExternalLoginRepository : IBaseRepository<ExternalLogin>;

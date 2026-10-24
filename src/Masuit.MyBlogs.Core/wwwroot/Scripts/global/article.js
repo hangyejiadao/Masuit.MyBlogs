@@ -248,13 +248,20 @@ createApp({
   },
   methods: {
     submit(item) {
-      if (item.NickName.trim().length <= 0 || item.NickName.trim().length > 24) {
-        message.error('昵称要求2-24个字符！');
-        return;
-      }
-      if (!/^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/.test(item.Email.trim())) {
-        message.error('请输入正确的邮箱格式！');
-        return;
+      if (window.blogUser && window.blogUser.isLogin) {
+        // 已登录：身份以登录账号为准，不再校验昵称/邮箱/邮箱验证码
+        item.NickName = window.blogUser.nickName;
+        item.Email = window.blogUser.email;
+        item.Code = '';
+      } else {
+        if (item.NickName.trim().length <= 0 || item.NickName.trim().length > 24) {
+          message.error('昵称要求2-24个字符！');
+          return;
+        }
+        if (!/^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/.test(item.Email.trim())) {
+          message.error('请输入正确的邮箱格式！');
+          return;
+        }
       }
       if (item.Content.trim().length <= 2 || item.Content.trim().length > 1000) {
         message.error('内容过短或者超长，请输入有效的留言内容！');
@@ -293,6 +300,11 @@ createApp({
           } catch (e) {
             console.error(e);
           }
+        } else if (data && data.IsLogin === false) {
+          message.error(data.Message || '请先登录后再发表评论！');
+          setTimeout(() => {
+            window.location.href = '/Passport/Login?from=' + encodeURIComponent(window.location.pathname + window.location.search);
+          }, 800);
         } else {
           message.error(data.Message);
         }

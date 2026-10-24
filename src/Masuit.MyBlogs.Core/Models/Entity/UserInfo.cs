@@ -61,4 +61,9 @@ public class UserInfo : BaseEntity
 	public string Avatar { get; set; }
 
 	public virtual ICollection<LoginRecord> LoginRecord { get; set; }
+
+	/// <summary>
+	/// 绑定的第三方登录账号
+	/// </summary>
+	public virtual ICollection<ExternalLogin> ExternalLogins { get; set; }
 }

@@ -34,6 +34,14 @@ public sealed class CommentController : BaseController
     [HttpPost, ValidateAntiForgeryToken, DistributedLockFilter]
     public async Task<ActionResult> Submit([FromServices] IInternalMessageService messageService, [FromServices] IEmailBlocklistService blocklistService, [FromBodyOrDefault] CommentCommand cmd)
     {
+        var sessionUser = HttpContext.Session.Get<UserInfoDto>(SessionKey.UserInfo);
+        if (sessionUser == null)
+        {
+            return ResultData(null, false, "请先登录后再发表评论！", false);
+        }
+
+        cmd.NickName = sessionUser.NickName;
+        cmd.Email = sessionUser.Email;
         var match = Regex.Match(cmd.NickName + cmd.Content.RemoveHtmlTag(), CommonHelper.BanRegex);
         if (match.Success)
         {

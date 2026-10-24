@@ -344,6 +344,44 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("EmailBlocklist");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ExternalLogin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProviderKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserInfoId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserInfoId");
+
+                    b.HasIndex("Provider", "ProviderKey")
+                        .IsUnique();
+
+                    b.ToTable("ExternalLogin");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.FastShare", b =>
                 {
                     b.Property<int>("Id")
@@ -1241,6 +1279,17 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.Navigation("Post");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ExternalLogin", b =>
+                {
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.UserInfo", "UserInfo")
+                        .WithMany("ExternalLogins")
+                        .HasForeignKey("UserInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserInfo");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.LeaveMessage", b =>
                 {
                     b.HasOne("Masuit.MyBlogs.Core.Models.Entity.LeaveMessage", "Parent")
@@ -1420,6 +1469,8 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.UserInfo", b =>
                 {
+                    b.Navigation("ExternalLogins");
+
                     b.Navigation("LoginRecord");
                 });
 #pragma warning restore 612, 618

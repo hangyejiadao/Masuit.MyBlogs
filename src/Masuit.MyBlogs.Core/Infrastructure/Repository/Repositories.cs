@@ -43,3 +43,5 @@ public sealed partial class PostVisitRecordStatsRepository : BaseRepository<Post
 public sealed partial class PostTagsRepository : BaseRepository<PostTag>, IPostTagsRepository;
 
 public sealed partial class EmailBlocklistRepository : BaseRepository<EmailBlocklist>, IEmailBlocklistRepository;
+
+public sealed partial class ExternalLoginRepository : BaseRepository<ExternalLogin>, IExternalLoginRepository;

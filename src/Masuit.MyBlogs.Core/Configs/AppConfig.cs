@@ -29,4 +29,9 @@ public class AppConfig
     /// 是否允许IP直接访问
     /// </summary>
     public static bool EnableIPDirect { get; set; }
+
+    /// <summary>
+    /// 第三方单点登录配置（GitHub / Google）
+    /// </summary>
+    public static OAuthConfig OAuth { get; set; } = new();
 }

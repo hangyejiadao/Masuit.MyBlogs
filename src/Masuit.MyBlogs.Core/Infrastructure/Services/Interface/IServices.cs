@@ -12,6 +12,8 @@ public partial interface ILinkLoopbackService : IBaseService<LinkLoopback>;
 
 public partial interface ILoginRecordService : IBaseService<LoginRecord>;
 
+public partial interface IExternalLoginService : IBaseService<ExternalLogin>;
+
 public partial interface IMiscService : IBaseService<Misc>;
 
 public partial interface INoticeService : IBaseService<Notice>;

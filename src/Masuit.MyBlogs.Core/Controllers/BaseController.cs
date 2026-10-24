@@ -176,6 +176,12 @@ public class BaseController : Controller
             return string.Empty;
         }
 
+        if (CurrentUser.Id > 0)
+        {
+            // 已登录用户以账号身份为准，不再要求邮箱验证码，仅保留邮箱黑名单校验
+            return mailSender.Any(e => e.Email == CurrentUser.Email) ? "您的账号邮箱已被限制使用，无法发表！" : string.Empty;
+        }
+
         if (string.IsNullOrEmpty(Request.Cookies["ValidateKey"]))
         {
             if (string.IsNullOrEmpty(code))

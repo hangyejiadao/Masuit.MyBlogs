@@ -25,6 +25,8 @@ public sealed partial class AppLicenseService(IBaseRepository<AppLicense> reposi
 
 public sealed partial class AppPricePlanService(IBaseRepository<AppPricePlan> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<AppPricePlan>(repository, searchEngine, searcher), IAppPricePlanService;
 
+public sealed partial class PortForwardRuleService(IBaseRepository<PortForwardRule> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<PortForwardRule>(repository, searchEngine, searcher), IPortForwardRuleService;
+
 public sealed partial class MiscService(IBaseRepository<Misc> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Misc>(repository, searchEngine, searcher), IMiscService;
 
 public sealed partial class NoticeService(IBaseRepository<Notice> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Notice>(repository, searchEngine, searcher), INoticeService;

@@ -53,3 +53,5 @@ public sealed partial class ApplicationInfoRepository : BaseRepository<Applicati
 public sealed partial class AppLicenseRepository : BaseRepository<AppLicense>, IAppLicenseRepository;
 
 public sealed partial class AppPricePlanRepository : BaseRepository<AppPricePlan>, IAppPricePlanRepository;
+
+public sealed partial class PortForwardRuleRepository : BaseRepository<PortForwardRule>, IPortForwardRuleRepository;

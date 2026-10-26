@@ -867,6 +867,48 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("Notice");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.PortForwardRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ListenPort")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetHost")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("TargetPort")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ListenPort")
+                        .IsUnique();
+
+                    b.ToTable("PortForwardRule");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Post", b =>
                 {
                     b.Property<int>("Id")

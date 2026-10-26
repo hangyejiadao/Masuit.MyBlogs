@@ -33,6 +33,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<AppLicense>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
+        modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.ListenPort).IsUnique();
 
         modelBuilder.Entity<Menu>().HasMany(e => e.Children).WithOne(m => m.Parent).IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Menu>().Property(c => c.Path).IsRequired();
@@ -163,6 +164,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<AppLicense> AppLicense { get; set; }
 
     public virtual DbSet<AppPricePlan> AppPricePlan { get; set; }
+
+    public virtual DbSet<PortForwardRule> PortForwardRule { get; set; }
 
     public virtual DbSet<Donate> Donate { get; set; }
 

@@ -458,6 +458,16 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
     ],
   },
   {
+    path: "/portforward",
+    name: "端口转发",
+    meta: {
+      roles: [],
+      title: "端口转发",
+      icon: "swap_horiz",
+    },
+    component: () => import("@/views/portforward/Index.vue"),
+  },
+  {
     path: "/:pathMatch(.*)*", // Vue Router 4 的通配符语法
     redirect: "/NoFound404",
     meta: {

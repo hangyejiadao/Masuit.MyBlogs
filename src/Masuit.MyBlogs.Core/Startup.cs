@@ -110,7 +110,7 @@ public class Startup
         services.AddSingleton<VedioMetadataCache>();
         services.AddHttpClient("VedioTmdb", client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-        services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration);
+        services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration).AddPortForward();
         services.AddBundling().UseDefaults(_env).UseNUglify().EnableMinification().EnableChangeDetection().EnableCacheHeader(TimeSpan.FromHours(1));
         services.AddSingleton<IRedisClient>(new RedisClient(AppConfig.Redis)
         {

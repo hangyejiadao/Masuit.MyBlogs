@@ -344,3 +344,5 @@ public partial interface IApplicationInfoRepository : IBaseRepository<Applicatio
 public partial interface IAppLicenseRepository : IBaseRepository<AppLicense>;
 
 public partial interface IAppPricePlanRepository : IBaseRepository<AppPricePlan>;
+
+public partial interface IPortForwardRuleRepository : IBaseRepository<PortForwardRule>;

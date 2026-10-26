@@ -24,16 +24,6 @@ public class ApplicationInfoCommand
 	/// 应用说明
 	/// </summary>
 	public string Description { get; set; }
-
-	/// <summary>
-	/// 当前版本号
-	/// </summary>
-	public string Version { get; set; }
-
-	/// <summary>
-	/// 安装包下载地址
-	/// </summary>
-	public string PackageUrl { get; set; }
 }
 
 /// <summary>
@@ -65,6 +55,42 @@ public class AppPricePlanCommand
 	/// 有效天数，0 表示永久
 	/// </summary>
 	public int ValidityDays { get; set; }
+
+	/// <summary>
+	/// 排序值，越小越靠前
+	/// </summary>
+	public int Sort { get; set; }
+}
+
+/// <summary>
+/// 应用版本保存参数（Id 为 0 表示新建）
+/// </summary>
+public class AppVersionCommand
+{
+	/// <summary>
+	/// 版本id，0 表示新建
+	/// </summary>
+	public int Id { get; set; }
+
+	/// <summary>
+	/// 所属应用id
+	/// </summary>
+	public int ApplicationInfoId { get; set; }
+
+	/// <summary>
+	/// 版本号，同一应用下不重复
+	/// </summary>
+	public string Version { get; set; }
+
+	/// <summary>
+	/// 该版本的安装包下载地址
+	/// </summary>
+	public string PackageUrl { get; set; }
+
+	/// <summary>
+	/// 版本日志（更新日志），多行文本
+	/// </summary>
+	public string ChangeLog { get; set; }
 
 	/// <summary>
 	/// 排序值，越小越靠前

@@ -35,6 +35,11 @@ public IAppLicenseService AppLicenseService { get; set;}
 public IAppPricePlanService AppPricePlanService { get; set;}
 
 /// <summary>
+/// 应用版本服务
+/// </summary>
+public IAppVersionService AppVersionService { get; set;}
+
+/// <summary>
 /// 授权管理首页：全部授权按到期时间排序
 /// </summary>
 /// <returns></returns>
@@ -84,10 +89,9 @@ a.Id,
 a.Name,
 a.AppKey,
 a.Description,
-a.Version,
-a.PackageUrl,
 LicenseCount = a.Licenses.Count,
-PlanCount = a.PricePlans.Count
+PlanCount = a.PricePlans.Count,
+VersionCount = a.Versions.Count
 }).ToList();
 return ResultData(new { Total = total, Items = items });
 }
@@ -191,8 +195,6 @@ var app = ApplicationInfoService.GetById(cmd.Id)?? throw new NotFoundException("
 app.Name = cmd.Name.Trim();
 app.AppKey = appKey;
 app.Description = cmd.Description?.Trim();
-app.Version = cmd.Version?.Trim();
-app.PackageUrl = cmd.PackageUrl?.Trim();
 return ResultData(null, ApplicationInfoService.SaveChanges() > 0, "应用已更新");
 }
 
@@ -201,8 +203,6 @@ var added = ApplicationInfoService.AddEntitySaved(new ApplicationInfo
 Name = cmd.Name.Trim(),
 AppKey = appKey,
 Description = cmd.Description?.Trim(),
-Version = cmd.Version?.Trim(),
-PackageUrl = cmd.PackageUrl?.Trim(),
 Status = Status.Available
 });
 return ResultData(null, added!= null, added!= null? "应用已创建": "应用创建失败");
@@ -290,6 +290,90 @@ return ResultData(null, false, "该方案已有授权在用，请先删除或改
 }
 
 var b = AppPricePlanService.DeleteById(cmd.Id);
+return ResultData(null, b, b? "删除成功！": "删除失败！");
+}
+
+/// <summary>
+/// 某应用的全部版本（供后台 Vue 的应用版本管理弹窗使用），按排序值升序、同排序值按 id 降序（新版本在前）
+/// </summary>
+/// <param name="applicationId">应用id</param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult VersionList(int applicationId)
+{
+var items = AppVersionService.GetQuery(v => v.ApplicationInfoId == applicationId).OrderBy(v => v.Sort).ThenByDescending(v => v.Id).Select(v => new
+{
+v.Id,
+v.ApplicationInfoId,
+v.Version,
+v.PackageUrl,
+v.ChangeLog,
+v.Sort
+}).ToList();
+return ResultData(items);
+}
+
+/// <summary>
+/// 新建或修改应用版本；每个版本对应一个自己的安装包，同一应用下版本号不重复
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost, MyAuthorize]
+public IActionResult SaveVersion([FromBodyOrDefault] AppVersionCommand cmd)
+{
+if (cmd == null || cmd.ApplicationInfoId <= 0 || string.IsNullOrWhiteSpace(cmd.Version))
+{
+return ResultData(null, false, "请选择应用并填写版本号！");
+}
+
+if (string.IsNullOrWhiteSpace(cmd.PackageUrl))
+{
+return ResultData(null, false, "每个版本必须对应一个安装包，请填写安装包地址！");
+}
+
+if (!ApplicationInfoService.Any(a => a.Id == cmd.ApplicationInfoId))
+{
+return ResultData(null, false, "所选应用不存在！");
+}
+
+var version = cmd.Version.Trim();
+if (AppVersionService.Any(v => v.ApplicationInfoId == cmd.ApplicationInfoId && v.Version == version && v.Id!= cmd.Id))
+{
+return ResultData(null, false, "该应用下已存在相同版本号，请更换！");
+}
+
+if (cmd.Id > 0)
+{
+var entity = AppVersionService.GetById(cmd.Id)?? throw new NotFoundException("版本不存在！");
+entity.ApplicationInfoId = cmd.ApplicationInfoId;
+entity.Version = version;
+entity.PackageUrl = cmd.PackageUrl.Trim();
+entity.ChangeLog = cmd.ChangeLog?.Trim();
+entity.Sort = cmd.Sort;
+return ResultData(null, AppVersionService.SaveChanges() > 0, "版本已更新");
+}
+
+var added = AppVersionService.AddEntitySaved(new AppVersion
+{
+ApplicationInfoId = cmd.ApplicationInfoId,
+Version = version,
+PackageUrl = cmd.PackageUrl.Trim(),
+ChangeLog = cmd.ChangeLog?.Trim(),
+Sort = cmd.Sort,
+Status = Status.Available
+});
+return ResultData(null, added!= null, added!= null? "版本已创建": "版本创建失败");
+}
+
+/// <summary>
+/// 删除应用版本，无引用限制，直接删除
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost, MyAuthorize]
+public IActionResult DeleteVersion([FromBodyOrDefault] LicenseIdCommand cmd)
+{
+var b = AppVersionService.DeleteById(cmd.Id);
 return ResultData(null, b, b? "删除成功！": "删除失败！");
 }
 

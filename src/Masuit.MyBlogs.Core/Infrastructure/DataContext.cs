@@ -28,6 +28,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
 
         modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.Licenses).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.PricePlans).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.Versions).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppVersion>().HasIndex(e => new { e.ApplicationInfoId, e.Version }).IsUnique();
         modelBuilder.Entity<ApplicationInfo>().HasIndex(e => e.AppKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserInfoId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AppLicense>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.SetNull);
@@ -164,6 +166,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<AppLicense> AppLicense { get; set; }
 
     public virtual DbSet<AppPricePlan> AppPricePlan { get; set; }
+
+    public virtual DbSet<AppVersion> AppVersion { get; set; }
 
     public virtual DbSet<PortForwardRule> PortForwardRule { get; set; }
 

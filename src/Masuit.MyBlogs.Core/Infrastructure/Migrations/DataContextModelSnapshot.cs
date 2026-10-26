@@ -284,6 +284,45 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("AppPricePlan");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ApplicationInfoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChangeLog")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("PackageUrl")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationInfoId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("AppVersion");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", b =>
                 {
                     b.Property<int>("Id")
@@ -306,16 +345,8 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<string>("PackageUrl")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Version")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 
@@ -1470,6 +1501,17 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.Navigation("Application");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppVersion", b =>
+                {
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", "Application")
+                        .WithMany("Versions")
+                        .HasForeignKey("ApplicationInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
                 {
                     b.HasOne("Masuit.MyBlogs.Core.Models.Entity.Category", "Parent")
@@ -1649,6 +1691,8 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.Navigation("Licenses");
 
                     b.Navigation("PricePlans");
+
+                    b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>

@@ -25,16 +25,9 @@ public class ApplicationInfo : BaseEntity
 	public string Description { get; set; }
 
 	/// <summary>
-	/// 当前版本号，如 1.2.0
+	/// 该应用发布的版本，每个版本对应一个安装包
 	/// </summary>
-	[MaxLength(32)]
-	public string Version { get; set; }
-
-	/// <summary>
-	/// 安装包下载地址（先只存地址，安装包文件由外部托管）
-	/// </summary>
-	[MaxLength(1024)]
-	public string PackageUrl { get; set; }
+	public virtual ICollection<AppVersion> Versions { get; set; }
 
 	/// <summary>
 	/// 该应用的价格方案

@@ -25,10 +25,10 @@
         <tr>
           <th class="text-left">应用名称</th>
           <th class="text-left">应用标识</th>
-          <th class="text-left">版本</th>
           <th class="text-left">说明</th>
           <th class="text-center">授权数</th>
           <th class="text-center">价格方案</th>
+          <th class="text-center">版本数</th>
           <th class="text-center">操作</th>
         </tr>
       </thead>
@@ -36,11 +36,12 @@
         <tr v-for="row in rows" :key="row.Id">
           <td class="text-left">{{ row.Name }}</td>
           <td class="text-left">{{ row.AppKey }}</td>
-          <td class="text-left">{{ row.Version || '-' }}</td>
           <td class="text-left">{{ row.Description || '-' }}</td>
           <td class="text-center">{{ row.LicenseCount }}</td>
           <td class="text-center">{{ row.PlanCount }}</td>
+          <td class="text-center">{{ row.VersionCount }}</td>
           <td class="text-center">
+            <q-btn flat dense size="sm" color="indigo" label="版本管理" @click="openVersions(row)" />
             <q-btn flat dense size="sm" color="teal" label="价格方案" @click="openPlans(row)" />
             <q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" />
             <q-btn flat dense size="sm" color="negative" label="删除" @click="askDelete(row)" />
@@ -68,8 +69,6 @@
       <q-card-section class="q-gutter-md">
         <q-input v-model="form.Name" outlined dense label="应用名称 *" />
         <q-input v-model="form.AppKey" outlined dense label="应用标识（留空自动生成）" />
-        <q-input v-model="form.Version" outlined dense label="版本号（如 1.2.0）" />
-        <q-input v-model="form.PackageUrl" outlined dense label="安装包下载地址" />
         <q-input v-model="form.Description" outlined dense type="textarea" rows="3" label="说明" />
       </q-card-section>
       <q-card-actions align="right">
@@ -158,6 +157,76 @@
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <q-dialog v-model="showVersions" persistent>
+    <q-card style="min-width: 760px">
+      <q-card-section>
+        <div class="text-h6">版本管理 — {{ versionApp?.Name }}</div>
+      </q-card-section>
+      <q-card-section>
+        <q-markup-table flat separator="cell" dense>
+          <thead>
+            <tr>
+              <th class="text-left">版本号</th>
+              <th class="text-left">安装包地址</th>
+              <th class="text-left">版本日志</th>
+              <th class="text-center">排序</th>
+              <th class="text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in versionRows" :key="v.Id">
+              <td class="text-left">{{ v.Version }}</td>
+              <td class="text-left">
+                <a v-if="v.PackageUrl" :href="v.PackageUrl" target="_blank" rel="noopener" class="ellipsis block" style="max-width: 220px">{{ v.PackageUrl }}</a>
+                <span v-else>-</span>
+              </td>
+              <td class="text-left">
+                <div class="ellipsis" style="max-width: 200px">{{ v.ChangeLog || '-' }}<q-tooltip v-if="v.ChangeLog" max-width="420px"><span style="white-space: pre-line">{{ v.ChangeLog }}</span></q-tooltip></div>
+              </td>
+              <td class="text-center">{{ v.Sort }}</td>
+              <td class="text-center">
+                <q-btn flat dense size="sm" color="primary" label="编辑" @click="editVersion(v)" />
+                <q-btn flat dense size="sm" color="negative" label="删除" @click="askDeleteVersion(v)" />
+              </td>
+            </tr>
+            <tr v-if="!versionLoading && versionRows.length === 0">
+              <td colspan="5" class="text-center text-grey">暂无版本，用下方表单新增</td>
+            </tr>
+          </tbody>
+        </q-markup-table>
+        <div class="q-mt-md q-gutter-sm">
+          <div class="text-subtitle2">{{ versionForm.Id > 0 ? '编辑版本' : '新增版本' }}</div>
+          <div class="row q-gutter-sm">
+            <q-input v-model="versionForm.Version" outlined dense label="版本号（如 1.2.0）*" class="col" />
+            <q-input v-model.number="versionForm.Sort" outlined dense type="number" label="排序" class="col" />
+          </div>
+          <q-input v-model="versionForm.PackageUrl" outlined dense label="安装包地址 *" />
+          <q-input v-model="versionForm.ChangeLog" outlined dense type="textarea" autogrow label="版本日志（更新日志）" />
+          <div class="row q-gutter-sm">
+            <q-btn color="primary" :label="versionForm.Id > 0 ? '保存修改' : '新增版本'" :loading="versionSubmitting" @click="saveVersion" />
+            <q-btn v-if="versionForm.Id > 0" flat label="取消编辑" @click="resetVersionForm" />
+          </div>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="关闭" @click="showVersions = false" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="showVersionDelete" persistent>
+    <q-card style="min-width: 320px">
+      <q-card-section>
+        <div class="text-h6">删除版本</div>
+      </q-card-section>
+      <q-card-section>确定要删除版本「{{ versionDeleteTarget?.Version }}」吗？该版本的安装包地址与版本日志将一并移除。</q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="取消" @click="showVersionDelete = false" />
+        <q-btn color="negative" label="删除" :loading="versionSubmitting" @click="doDeleteVersion" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </div>
 </template>
 
@@ -171,10 +240,18 @@ interface AppRow {
   Name: string
   AppKey: string
   Description?: string
-  Version?: string
-  PackageUrl?: string
   LicenseCount: number
   PlanCount: number
+  VersionCount: number
+}
+
+interface VersionRow {
+  Id: number
+  ApplicationInfoId: number
+  Version: string
+  PackageUrl: string
+  ChangeLog?: string
+  Sort: number
 }
 
 interface PlanRow {
@@ -201,7 +278,7 @@ const loading = ref(false)
 const submitting = ref(false)
 
 const showDialog = ref(false)
-const form = ref({ Id: 0, Name: '', AppKey: '', Description: '', Version: '', PackageUrl: '' })
+const form = ref({ Id: 0, Name: '', AppKey: '', Description: '' })
 const showDelete = ref(false)
 const deleteTarget = ref<AppRow | null>(null)
 
@@ -213,6 +290,15 @@ const planSubmitting = ref(false)
 const planForm = ref({ Id: 0, Name: '', Price: 0, ValidityDays: 365, Sort: 0 })
 const showPlanDelete = ref(false)
 const planDeleteTarget = ref<PlanRow | null>(null)
+
+const showVersions = ref(false)
+const versionApp = ref<AppRow | null>(null)
+const versionRows = ref<VersionRow[]>([])
+const versionLoading = ref(false)
+const versionSubmitting = ref(false)
+const versionForm = ref({ Id: 0, Version: '', PackageUrl: '', ChangeLog: '', Sort: 0 })
+const showVersionDelete = ref(false)
+const versionDeleteTarget = ref<VersionRow | null>(null)
 
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
 
@@ -233,12 +319,12 @@ const reload = () => {
 }
 
 const openCreate = () => {
-  form.value = { Id: 0, Name: '', AppKey: '', Description: '', Version: '', PackageUrl: '' }
+  form.value = { Id: 0, Name: '', AppKey: '', Description: '' }
   showDialog.value = true
 }
 
 const openEdit = (row: AppRow) => {
-  form.value = { Id: row.Id, Name: row.Name, AppKey: row.AppKey, Description: row.Description ?? '', Version: row.Version ?? '', PackageUrl: row.PackageUrl ?? '' }
+  form.value = { Id: row.Id, Name: row.Name, AppKey: row.AppKey, Description: row.Description ?? '' }
   showDialog.value = true
 }
 
@@ -349,6 +435,78 @@ const doDeletePlan = async () => {
     }
   } finally {
     planSubmitting.value = false
+  }
+}
+
+const resetVersionForm = () => {
+  versionForm.value = { Id: 0, Version: '', PackageUrl: '', ChangeLog: '', Sort: 0 }
+}
+
+const loadVersions = async () => {
+  if (!versionApp.value) return
+  versionLoading.value = true
+  try {
+    const res = await api.get('/License/VersionList', { params: { applicationId: versionApp.value.Id } }) as ApiResponse
+    versionRows.value = res.Data ?? []
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+const openVersions = (row: AppRow) => {
+  versionApp.value = row
+  resetVersionForm()
+  showVersions.value = true
+  loadVersions()
+}
+
+const editVersion = (v: VersionRow) => {
+  versionForm.value = { Id: v.Id, Version: v.Version, PackageUrl: v.PackageUrl, ChangeLog: v.ChangeLog ?? '', Sort: v.Sort }
+}
+
+const saveVersion = async () => {
+  if (!versionApp.value) return
+  if (!versionForm.value.Version.trim()) {
+    toast.error('版本号不能为空')
+    return
+  }
+  if (!versionForm.value.PackageUrl.trim()) {
+    toast.error('每个版本必须对应一个安装包，请填写安装包地址')
+    return
+  }
+  versionSubmitting.value = true
+  try {
+    const res = await api.post('/License/SaveVersion', { ...versionForm.value, ApplicationInfoId: versionApp.value.Id }) as ApiResponse
+    if (res.Success) {
+      toast.success(res.Message || '保存成功')
+      resetVersionForm()
+      loadVersions()
+      load()
+    }
+  } finally {
+    versionSubmitting.value = false
+  }
+}
+
+const askDeleteVersion = (v: VersionRow) => {
+  versionDeleteTarget.value = v
+  showVersionDelete.value = true
+}
+
+const doDeleteVersion = async () => {
+  if (!versionDeleteTarget.value) return
+  versionSubmitting.value = true
+  try {
+    const res = await api.post('/License/DeleteVersion', { Id: versionDeleteTarget.value.Id }) as ApiResponse
+    if (res.Success) {
+      toast.success(res.Message || '删除成功')
+      showVersionDelete.value = false
+      if (versionForm.value.Id === versionDeleteTarget.value.Id) resetVersionForm()
+      loadVersions()
+      load()
+    }
+  } finally {
+    versionSubmitting.value = false
   }
 }
 

@@ -16,6 +16,7 @@
 @{
   var menus = MenuService.GetQueryNoTracking(m => m.Status == Status.Available, m => m.Sort).Cacheable().ToTree(m => m.Id, m => m.ParentId);
   var user = Context.Session.Get<UserInfoDto>(SessionKey.UserInfo) ?? new UserInfoDto();
+  var currentUser = Context.Session.Get<UserInfoDto>(SessionKey.UserInfo);
   var links = LinksService.GetQuery(l => l.Status == Status.Available).OrderByDescending(l => l.Recommend).ThenByDescending(l => l.Loopbacks.GroupBy(x => x.IP).Count()).Take(30).Select(e => new {
     e.Url,
     e.Name
@@ -140,6 +141,25 @@
           </li>
           <li>
             <a asp-action="Index" asp-controller="Dashboard" target="_blank">控制面板</a>
+          </li>
+          <li>
+            <a> | </a>
+          </li>
+        }
+
+        if (currentUser != null) {
+          <li>
+            <a>@currentUser.NickName</a>
+          </li>
+          <li>
+            <a href="/Passport/Logout">退出登录</a>
+          </li>
+          <li>
+            <a> | </a>
+          </li>
+        } else {
+          <li>
+            <a href="/Passport/Login">登录</a>
           </li>
           <li>
             <a> | </a>

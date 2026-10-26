@@ -28,7 +28,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
 
         modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.Licenses).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ApplicationInfo>().HasIndex(e => e.AppKey).IsUnique();
-        modelBuilder.Entity<Customer>().HasMany(e => e.Licenses).WithOne(e => e.Customer).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppLicense>().HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserInfoId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
 
@@ -155,8 +155,6 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<LoginRecord> LoginRecord { get; set; }
 
     public virtual DbSet<ExternalLogin> ExternalLogin { get; set; }
-
-    public virtual DbSet<Customer> Customer { get; set; }
 
     public virtual DbSet<ApplicationInfo> ApplicationInfo { get; set; }
 

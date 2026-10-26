@@ -17,7 +17,7 @@ public sealed partial class LoginRecordService(IBaseRepository<LoginRecord> repo
 
 public sealed partial class ExternalLoginService(IBaseRepository<ExternalLogin> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<ExternalLogin>(repository, searchEngine, searcher), IExternalLoginService;
 
-public sealed partial class CustomerService(IBaseRepository<Customer> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Customer>(repository, searchEngine, searcher), ICustomerService;
+
 
 public sealed partial class ApplicationInfoService(IBaseRepository<ApplicationInfo> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<ApplicationInfo>(repository, searchEngine, searcher), IApplicationInfoService;
 

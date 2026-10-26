@@ -446,16 +446,6 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
         component: () => import("@/views/license/Applications.vue"),
       },
       {
-        path: "customers",
-        name: "license-customers",
-        meta: {
-          roles: [],
-          title: "客户管理",
-          icon: "people",
-        },
-        component: () => import("@/views/license/Customers.vue"),
-      },
-      {
         path: "list",
         name: "license-list",
         meta: {

@@ -10,7 +10,7 @@
         </div>
       </div>
       <div class="col-auto">
-        <q-input v-model="keyword" outlined dense placeholder="搜索授权码、应用或客户" @keyup.enter="reload">
+        <q-input v-model="keyword" outlined dense placeholder="搜索授权码、应用或用户" @keyup.enter="reload">
           <template v-slot:prepend>
             <q-icon name="search" />
           </template>
@@ -24,7 +24,7 @@
       <thead>
         <tr>
           <th class="text-left">应用</th>
-          <th class="text-left">客户</th>
+          <th class="text-left">用户</th>
           <th class="text-left">提醒邮箱</th>
           <th class="text-left">授权码</th>
           <th class="text-left">生效日期</th>
@@ -36,8 +36,8 @@
       <tbody>
         <tr v-for="row in rows" :key="row.Id">
           <td class="text-left">{{ row.ApplicationName }}</td>
-          <td class="text-left">{{ row.CustomerName }}</td>
-          <td class="text-left">{{ row.CustomerEmail || '-' }}</td>
+          <td class="text-left">{{ row.UserNickName || row.UserName }}</td>
+          <td class="text-left">{{ row.UserEmail || '-' }}</td>
           <td class="text-left">{{ row.LicenseKey }}</td>
           <td class="text-left">{{ fmtDate(row.StartDate) }}</td>
           <td class="text-left">{{ fmtDate(row.ExpireDate) }}</td>
@@ -72,7 +72,7 @@
       </q-card-section>
       <q-card-section class="q-gutter-md">
         <q-select v-model="form.ApplicationInfoId" :options="appOptions" emit-value map-options outlined dense label="应用 *" />
-        <q-select v-model="form.CustomerId" :options="customerOptions" emit-value map-options outlined dense label="客户（提醒发到该客户邮箱）*" />
+        <q-select v-model="form.UserInfoId" :options="userOptions" emit-value map-options outlined dense label="被授权用户（用户管理中的普通用户，提醒发到其邮箱）*" />
         <q-input v-model="form.LicenseKey" outlined dense label="授权码（留空自动生成）" />
         <q-input v-model="form.StartDate" outlined dense type="date" label="生效日期 *" />
         <q-input v-model="form.ExpireDate" outlined dense type="date" label="到期日期 *" />
@@ -91,7 +91,7 @@
         <div class="text-h6">授权续期</div>
       </q-card-section>
       <q-card-section class="q-gutter-md">
-        <div>应用「{{ renewTarget?.ApplicationName }}」/ 客户「{{ renewTarget?.CustomerName }}」，当前到期：{{ renewTarget ? fmtDate(renewTarget.ExpireDate) : '' }}</div>
+        <div>应用「{{ renewTarget?.ApplicationName }}」/ 用户「{{ renewTarget ? (renewTarget.UserNickName || renewTarget.UserName) : '' }}」，当前到期：{{ renewTarget ? fmtDate(renewTarget.ExpireDate) : '' }}</div>
         <q-input v-model.number="renewMonths" outlined dense type="number" min="1" label="续期月数" />
       </q-card-section>
       <q-card-actions align="right">
@@ -106,7 +106,7 @@
       <q-card-section>
         <div class="text-h6">发送到期提醒</div>
       </q-card-section>
-      <q-card-section>立即给客户「{{ remindTarget?.CustomerName }}」（{{ remindTarget?.CustomerEmail || '未填邮箱' }}）发送一封到期提醒邮件？</q-card-section>
+      <q-card-section>立即给用户「{{ remindTarget ? (remindTarget.UserNickName || remindTarget.UserName) : '' }}」（{{ remindTarget?.UserEmail || '未填邮箱' }}）发送一封到期提醒邮件？</q-card-section>
       <q-card-actions align="right">
         <q-btn flat label="取消" @click="showRemind = false" />
         <q-btn color="orange" label="发送" :loading="submitting" @click="doRemind" />
@@ -138,9 +138,10 @@ interface LicenseRow {
   Id: number
   ApplicationInfoId: number
   ApplicationName: string
-  CustomerId: number
-  CustomerName: string
-  CustomerEmail?: string
+  UserInfoId: number
+  UserName: string
+  UserNickName?: string
+  UserEmail?: string
   LicenseKey: string
   StartDate: string
   ExpireDate: string
@@ -162,10 +163,10 @@ const loading = ref(false)
 const submitting = ref(false)
 
 const appOptions = ref<{ label: string; value: number }[]>([])
-const customerOptions = ref<{ label: string; value: number }[]>([])
+const userOptions = ref<{ label: string; value: number }[]>([])
 
 const showDialog = ref(false)
-const form = ref({ Id: 0, ApplicationInfoId: null as number | null, CustomerId: null as number | null, LicenseKey: '', StartDate: '', ExpireDate: '', Remark: '' })
+const form = ref({ Id: 0, ApplicationInfoId: null as number | null, UserInfoId: null as number | null, LicenseKey: '', StartDate: '', ExpireDate: '', Remark: '' })
 const showRenew = ref(false)
 const renewTarget = ref<LicenseRow | null>(null)
 const renewMonths = ref(12)
@@ -210,7 +211,7 @@ const loadOptions = async () => {
   const res = await api.get('/License/LicenseOptions') as ApiResponse
   if (res.Success) {
     appOptions.value = (res.Data?.Applications ?? []).map((a: any) => ({ label: a.Name, value: a.Id }))
-    customerOptions.value = (res.Data?.Customers ?? []).map((c: any) => ({ label: c.Email ? `${c.Name}（${c.Email}）` : c.Name, value: c.Id }))
+    userOptions.value = (res.Data?.Users ?? []).map((u: any) => ({ label: `${u.NickName || u.Username}${u.Email ? `（${u.Email}）` : ''}`, value: u.Id }))
   }
 }
 
@@ -231,18 +232,18 @@ const openCreate = () => {
   expireDate.setFullYear(expireDate.getFullYear() + 1)
   const pad = (n: number) => String(n).padStart(2, '0')
   const expire = `${expireDate.getFullYear()}-${pad(expireDate.getMonth() + 1)}-${pad(expireDate.getDate())}`
-  form.value = { Id: 0, ApplicationInfoId: null, CustomerId: null, LicenseKey: '', StartDate: start, ExpireDate: expire, Remark: '' }
+  form.value = { Id: 0, ApplicationInfoId: null, UserInfoId: null, LicenseKey: '', StartDate: start, ExpireDate: expire, Remark: '' }
   showDialog.value = true
 }
 
 const openEdit = (row: LicenseRow) => {
-  form.value = { Id: row.Id, ApplicationInfoId: row.ApplicationInfoId, CustomerId: row.CustomerId, LicenseKey: row.LicenseKey, StartDate: fmtDate(row.StartDate), ExpireDate: fmtDate(row.ExpireDate), Remark: row.Remark ?? '' }
+  form.value = { Id: row.Id, ApplicationInfoId: row.ApplicationInfoId, UserInfoId: row.UserInfoId, LicenseKey: row.LicenseKey, StartDate: fmtDate(row.StartDate), ExpireDate: fmtDate(row.ExpireDate), Remark: row.Remark ?? '' }
   showDialog.value = true
 }
 
 const save = async () => {
-  if (!form.value.ApplicationInfoId || !form.value.CustomerId) {
-    toast.error('请选择应用和客户')
+  if (!form.value.ApplicationInfoId || !form.value.UserInfoId) {
+    toast.error('请选择应用和用户')
     return
   }
   if (!form.value.StartDate || !form.value.ExpireDate) {

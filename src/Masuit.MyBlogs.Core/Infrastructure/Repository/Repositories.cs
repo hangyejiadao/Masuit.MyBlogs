@@ -46,7 +46,7 @@ public sealed partial class EmailBlocklistRepository : BaseRepository<EmailBlock
 
 public sealed partial class ExternalLoginRepository : BaseRepository<ExternalLogin>, IExternalLoginRepository;
 
-public sealed partial class CustomerRepository : BaseRepository<Customer>, ICustomerRepository;
+
 
 public sealed partial class ApplicationInfoRepository : BaseRepository<ApplicationInfo>, IApplicationInfoRepository;
 

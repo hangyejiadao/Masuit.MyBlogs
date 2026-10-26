@@ -4,12 +4,12 @@
   ViewBag.Title = "授权管理";
   Layout = "~/Views/Shared/_Layout.cshtml";
   var apps = ViewBag.Applications as List<ApplicationInfo> ?? new List<ApplicationInfo>();
-  var customers = ViewBag.Customers as List<Customer> ?? new List<Customer>();
+  var users = ViewBag.Users as List<UserInfo> ?? new List<UserInfo>();
   var editorData = Model.Select(l => new
   {
     id = l.Id,
     applicationInfoId = l.ApplicationInfoId,
-    customerId = l.CustomerId,
+    userInfoId = l.UserInfoId,
     licenseKey = l.LicenseKey,
     startDate = l.StartDate.ToString("yyyy-MM-dd"),
     expireDate = l.ExpireDate.ToString("yyyy-MM-dd"),
@@ -44,10 +44,9 @@
   <div class="lic-nav">
     <a class="active" href="/License/Index">授权管理</a>
     <a href="/License/Applications">应用管理</a>
-    <a href="/License/Customers">客户管理</a>
   </div>
-  @if (apps.Count == 0 || customers.Count == 0) {
-    <p style="color:#b26a00;">提示：签发授权前需要先在「应用管理」和「客户管理」中建好应用与客户。</p>
+  @if (apps.Count == 0 || users.Count == 0) {
+    <p style="color:#b26a00;">提示：签发授权前需要先在「应用管理」中建好应用；被授权用户来自「用户管理」中的普通用户。</p>
   }
   <div class="lic-form">
     <input id="licId" type="hidden" value="0">
@@ -56,9 +55,9 @@
         @foreach (var a in apps) { <option value="@a.Id">@a.Name</option> }
       </select>
     </div>
-    <div class="field"><label>客户</label>
-      <select id="licCustomer">
-        @foreach (var c in customers) { <option value="@c.Id">@c.Name</option> }
+    <div class="field"><label>被授权用户</label>
+      <select id="licUser">
+        @foreach (var u in users) { <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.NickName) ? u.Username : u.NickName)（@u.Email）</option> }
       </select>
     </div>
     <div class="field"><label>授权码（留空自动生成）</label><input id="licKey" placeholder="LIC-XXXXXX-…" style="width:230px;" type="text"></div>
@@ -69,13 +68,13 @@
     <button class="lic-btn gray" onclick="resetForm()">新建</button>
   </div>
   <table class="lic-table">
-    <thead><tr><th>应用</th><th>客户</th><th>授权码</th><th>生效</th><th>到期</th><th>状态</th><th>上次提醒</th><th>操作</th></tr></thead>
+    <thead><tr><th>应用</th><th>用户</th><th>授权码</th><th>生效</th><th>到期</th><th>状态</th><th>上次提醒</th><th>操作</th></tr></thead>
     <tbody>
     @foreach (var l in Model) {
       var days = (l.ExpireDate.Date - DateTime.Today).Days;
       <tr>
         <td>@l.Application?.Name</td>
-        <td>@l.Customer?.Name</td>
+        <td>@(string.IsNullOrWhiteSpace(l.User?.NickName) ? l.User?.Username : l.User.NickName)</td>
         <td class="key">@l.LicenseKey</td>
         <td>@l.StartDate.ToString("yyyy-MM-dd")</td>
         <td>@l.ExpireDate.ToString("yyyy-MM-dd")</td>
@@ -119,7 +118,7 @@
   function editLicense(id) {
     const l = licenses.find(x => x.id === id);
     if (!l) return;
-    $('licId').value = l.id; $('licApp').value = l.applicationInfoId; $('licCustomer').value = l.customerId;
+    $('licId').value = l.id; $('licApp').value = l.applicationInfoId; $('licUser').value = l.userInfoId;
     $('licKey').value = l.licenseKey; $('licStart').value = l.startDate; $('licExpire').value = l.expireDate; $('licRemark').value = l.remark;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -127,7 +126,7 @@
     doPost('/License/SaveLicense', {
       id: parseInt($('licId').value) || 0,
       applicationInfoId: parseInt($('licApp').value) || 0,
-      customerId: parseInt($('licCustomer').value) || 0,
+      userInfoId: parseInt($('licUser').value) || 0,
       licenseKey: $('licKey').value.trim(),
       startDate: $('licStart').value,
       expireDate: $('licExpire').value,
@@ -135,6 +134,6 @@
     });
   }
   function renewLicense(id) { if (confirm('确定要给该授权续期 1 年吗？')) doPost('/License/RenewLicense', { id, months: 12 }); }
-  function remindNow(id) { if (confirm('确定立即给该客户发送到期提醒邮件吗？')) doPost('/License/SendReminderNow', { id }); }
+  function remindNow(id) { if (confirm('确定立即给该用户发送到期提醒邮件吗？')) doPost('/License/SendReminderNow', { id }); }
   function delLicense(id, key) { if (confirm('确定要删除授权 ' + key + ' 吗？')) doPost('/License/DeleteLicense', { id }); }
 </script>

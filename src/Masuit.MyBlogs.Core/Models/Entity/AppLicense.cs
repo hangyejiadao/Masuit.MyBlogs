@@ -1,7 +1,7 @@
 namespace Masuit.MyBlogs.Core.Models.Entity;
 
 /// <summary>
-/// 应用授权（License），绑定一个应用和一个客户，约定授权使用期限
+/// 应用授权（License），绑定一个应用和一个博客用户（即用户管理中的普通用户），约定授权使用期限
 /// </summary>
 [Table("AppLicense")]
 public class AppLicense : BaseEntity
@@ -17,14 +17,14 @@ public class AppLicense : BaseEntity
 	public virtual ApplicationInfo Application { get; set; }
 
 	/// <summary>
-	/// 被授权的客户id
+	/// 被授权的博客用户id
 	/// </summary>
-	public int CustomerId { get; set; }
+	public int UserInfoId { get; set; }
 
 	/// <summary>
-	/// 被授权的客户
+	/// 被授权的博客用户，到期提醒发到该用户的邮箱
 	/// </summary>
-	public virtual Customer Customer { get; set; }
+	public virtual UserInfo User { get; set; }
 
 	/// <summary>
 	/// 授权码，创建时不填则自动生成

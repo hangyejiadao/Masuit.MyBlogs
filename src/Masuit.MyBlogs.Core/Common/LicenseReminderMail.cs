@@ -8,14 +8,14 @@ public static class LicenseReminderMail
 /// <summary>
 /// 构建提醒邮件的标题和正文
 /// </summary>
-/// <param name="license">授权记录，需已加载 Application 和 Customer</param>
+/// <param name="license">授权记录，需已加载 Application 和 User</param>
 /// <param name="daysRemaining">距离到期的天数，0 表示今天到期</param>
 /// <returns>邮件标题和 HTML 正文</returns>
 public static (string Title, string Content) Build(AppLicense license, int daysRemaining)
 {
 var site = CommonHelper.SystemSettings.GetOrAdd("Title", "博客");
 var app = license.Application?.Name?? string.Empty;
-var customer = license.Customer?.Name?? string.Empty;
+var customer = license.User?.NickName?? license.User?.Username?? string.Empty;
 var title = daysRemaining > 0? $"授权即将到期提醒（剩余 {daysRemaining} 天）": $"授权今日到期提醒";
 var when = daysRemaining > 0? $"将于 <b>{license.ExpireDate:yyyy-MM-dd}</b> 到期（剩余 {daysRemaining} 天）": $"已于 <b>{license.ExpireDate:yyyy-MM-dd}</b> 到期";
 var content = $"""

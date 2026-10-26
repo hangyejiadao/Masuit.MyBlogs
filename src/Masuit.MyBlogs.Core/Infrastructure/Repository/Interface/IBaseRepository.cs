@@ -337,7 +337,7 @@ public partial interface IEmailBlocklistRepository : IBaseRepository<EmailBlockl
 
 public partial interface IExternalLoginRepository : IBaseRepository<ExternalLogin>;
 
-public partial interface ICustomerRepository : IBaseRepository<Customer>;
+
 
 public partial interface IApplicationInfoRepository : IBaseRepository<ApplicationInfo>;
 

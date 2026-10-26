@@ -63,6 +63,118 @@ return View(customers);
 }
 
 /// <summary>
+/// 应用分页查询（供后台 Vue 页面使用），可按名称或标识关键字筛选
+/// </summary>
+/// <param name="page">页码，从 1 开始</param>
+/// <param name="size">每页条数，最大 100</param>
+/// <param name="keyword">名称或标识关键字，可空</param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult ApplicationPage(int page = 1, int size = 10, string keyword = null)
+{
+page = Math.Max(1, page);
+size = Math.Clamp(size, 1, 100);
+var query = ApplicationInfoService.GetQuery(a => true);
+if (!string.IsNullOrWhiteSpace(keyword))
+{
+var kw = keyword.Trim();
+query = query.Where(a => a.Name.Contains(kw) || a.AppKey.Contains(kw));
+}
+
+var total = query.Count();
+var items = query.OrderBy(a => a.Name).Skip((page - 1) * size).Take(size).Select(a => new
+{
+a.Id,
+a.Name,
+a.AppKey,
+a.Description,
+LicenseCount = a.Licenses.Count
+}).ToList();
+return ResultData(new { Total = total, Items = items });
+}
+
+/// <summary>
+/// 客户分页查询（供后台 Vue 页面使用），可按名称、联系人或邮箱关键字筛选
+/// </summary>
+/// <param name="page">页码，从 1 开始</param>
+/// <param name="size">每页条数，最大 100</param>
+/// <param name="keyword">名称、联系人或邮箱关键字，可空</param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult CustomerPage(int page = 1, int size = 10, string keyword = null)
+{
+page = Math.Max(1, page);
+size = Math.Clamp(size, 1, 100);
+var query = CustomerService.GetQuery(c => true);
+if (!string.IsNullOrWhiteSpace(keyword))
+{
+var kw = keyword.Trim();
+query = query.Where(c => c.Name.Contains(kw) || (c.ContactName != null && c.ContactName.Contains(kw)) || (c.Email != null && c.Email.Contains(kw)));
+}
+
+var total = query.Count();
+var items = query.OrderBy(c => c.Name).Skip((page - 1) * size).Take(size).Select(c => new
+{
+c.Id,
+c.Name,
+c.ContactName,
+c.Email,
+c.Phone,
+c.Remark,
+LicenseCount = c.Licenses.Count
+}).ToList();
+return ResultData(new { Total = total, Items = items });
+}
+
+/// <summary>
+/// 授权分页查询（供后台 Vue 页面使用），按到期时间升序，可按授权码、应用名或客户名关键字筛选
+/// </summary>
+/// <param name="page">页码，从 1 开始</param>
+/// <param name="size">每页条数，最大 100</param>
+/// <param name="keyword">授权码、应用名或客户名关键字，可空</param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult LicensePage(int page = 1, int size = 10, string keyword = null)
+{
+page = Math.Max(1, page);
+size = Math.Clamp(size, 1, 100);
+var query = AppLicenseService.GetQuery(l => true);
+if (!string.IsNullOrWhiteSpace(keyword))
+{
+var kw = keyword.Trim();
+query = query.Where(l => l.LicenseKey.Contains(kw) || l.Application.Name.Contains(kw) || l.Customer.Name.Contains(kw));
+}
+
+var total = query.Count();
+var items = query.OrderBy(l => l.ExpireDate).Skip((page - 1) * size).Take(size).Select(l => new
+{
+l.Id,
+l.ApplicationInfoId,
+ApplicationName = l.Application.Name,
+l.CustomerId,
+CustomerName = l.Customer.Name,
+CustomerEmail = l.Customer.Email,
+l.LicenseKey,
+l.StartDate,
+l.ExpireDate,
+l.Remark
+}).ToList();
+return ResultData(new { Total = total, Items = items });
+}
+
+/// <summary>
+/// 授权编辑表单的下拉选项：全部应用与客户（供后台 Vue 页面使用）
+/// </summary>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult LicenseOptions()
+{
+var applications = ApplicationInfoService.GetQuery(a => true).OrderBy(a => a.Name).Select(a => new { a.Id, a.Name }).ToList();
+var customers = CustomerService.GetQuery(c => true).OrderBy(c => c.Name).Select(c => new { c.Id, c.Name, c.Email }).ToList();
+return ResultData(new { Applications = applications, Customers = customers });
+}
+
+/// <summary>
 /// 新建或修改应用
 /// </summary>
 /// <param name="cmd"></param>

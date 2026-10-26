@@ -26,6 +26,7 @@
           <th class="text-left">名称</th>
           <th class="text-center">监听端口</th>
           <th class="text-left">目标</th>
+          <th class="text-left">路径</th>
           <th class="text-center">启用</th>
           <th class="text-center">监听状态</th>
           <th class="text-center">活跃连接</th>
@@ -39,6 +40,7 @@
           <td class="text-left">{{ row.Name }}</td>
           <td class="text-center">{{ row.ListenPort }}</td>
           <td class="text-left">{{ row.TargetHost }}:{{ row.TargetPort }}</td>
+          <td class="text-left">{{ row.Path || '-' }}</td>
           <td class="text-center">
             <q-toggle :model-value="row.Enabled" dense @update:model-value="toggleEnabled(row)" />
           </td>
@@ -58,7 +60,7 @@
           </td>
         </tr>
         <tr v-if="!loading && rows.length === 0">
-          <td colspan="9" class="text-center text-grey">暂无数据</td>
+          <td colspan="10" class="text-center text-grey">暂无数据</td>
         </tr>
       </tbody>
     </q-markup-table>
@@ -82,6 +84,8 @@
           hint="只能填 10000-10100：博客运行在 Docker 容器中，只有这个端口段会发布到宿主机，超出范围外部无法访问" />
         <q-input v-model="form.TargetHost" outlined dense label="目标地址 *（IP 或主机名）" />
         <q-input v-model.number="form.TargetPort" outlined dense type="number" min="1" max="65535" label="目标端口 *" />
+        <q-input v-model="form.Path" outlined dense label="路径（可选，如 /mcp）"
+          hint="留空不启用；填了如 /mcp 后，访问博客该路径的 HTTP 请求会被代理转发到目标并剥掉此前缀（例：访问 /mcp/mcp/foo 实际请求目标的 /mcp/foo），与监听端口相互独立、可同时启用" />
         <div class="row items-center">
           <span class="q-mr-md">是否启用</span>
           <q-toggle v-model="form.Enabled" dense />
@@ -121,6 +125,7 @@ interface RuleRow {
   ListenPort: number
   TargetHost: string
   TargetPort: number
+  Path?: string
   Enabled: boolean
   Remark?: string
   IsListening: boolean
@@ -145,7 +150,7 @@ const loading = ref(false)
 const submitting = ref(false)
 
 const showDialog = ref(false)
-const form = ref({ Id: 0, Name: '', ListenPort: 10000, TargetHost: '', TargetPort: 0, Enabled: true, Remark: '' })
+const form = ref({ Id: 0, Name: '', ListenPort: 10000, TargetHost: '', TargetPort: 0, Path: '', Enabled: true, Remark: '' })
 const showDelete = ref(false)
 const deleteTarget = ref<RuleRow | null>(null)
 
@@ -175,12 +180,12 @@ const reload = () => {
 }
 
 const openCreate = () => {
-  form.value = { Id: 0, Name: '', ListenPort: 10000, TargetHost: '', TargetPort: 0, Enabled: true, Remark: '' }
+  form.value = { Id: 0, Name: '', ListenPort: 10000, TargetHost: '', TargetPort: 0, Path: '', Enabled: true, Remark: '' }
   showDialog.value = true
 }
 
 const openEdit = (row: RuleRow) => {
-  form.value = { Id: row.Id, Name: row.Name, ListenPort: row.ListenPort, TargetHost: row.TargetHost, TargetPort: row.TargetPort, Enabled: row.Enabled, Remark: row.Remark ?? '' }
+  form.value = { Id: row.Id, Name: row.Name, ListenPort: row.ListenPort, TargetHost: row.TargetHost, TargetPort: row.TargetPort, Path: row.Path ?? '', Enabled: row.Enabled, Remark: row.Remark ?? '' }
   showDialog.value = true
 }
 
@@ -215,6 +220,12 @@ const save = async () => {
     toast.error('目标端口必须在 1-65535 之间')
     return
   }
+  const path = form.value.Path.trim()
+  if (path && (!path.startsWith('/') || path.length < 2 || path.endsWith('/') || path.includes(' ') || path.includes('..'))) {
+    toast.error('路径必须以 / 开头、长度至少 2、不能以 / 结尾、不能包含空格或 ..（如 /mcp）')
+    return
+  }
+  form.value.Path = path
   if (await savePayload(form.value)) {
     showDialog.value = false
     load()
@@ -228,6 +239,7 @@ const toggleEnabled = async (row: RuleRow) => {
     ListenPort: row.ListenPort,
     TargetHost: row.TargetHost,
     TargetPort: row.TargetPort,
+    Path: row.Path ?? '',
     Enabled: !row.Enabled,
     Remark: row.Remark ?? ''
   })

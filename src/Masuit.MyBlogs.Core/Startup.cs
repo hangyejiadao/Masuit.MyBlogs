@@ -165,6 +165,7 @@ public class Startup
         {
             app.UseExceptionHandler("/ServiceUnavailable");
         }
+        app.UseMiddleware<PortForwardProxyMiddleware>(); //端口转发路径代理：命中规则路径时剥前缀代理并短路管道，不走博客自身逻辑
         app.UseReleaseMetadata(env);
         app.UseMiddleware<HttpRequestLoggingMiddleware>();
         app.UseBundles();

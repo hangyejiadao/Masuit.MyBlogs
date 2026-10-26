@@ -22,6 +22,19 @@ private const int MinListenPort = 10000;
 private const int MaxListenPort = 10100;
 
 /// <summary>
+/// 路径转发的保留前缀：与博客自身路由冲突，规则路径不得等于这些前缀或落在它们之下。
+/// 除后台/登录/博客内容等基础路由外，还包含第三方登录回调（/signin-github、/signin-google）、
+/// 短链（/short）、Blazor 连接（/_blazor）、健康检查（/health）、Hangfire 面板（/taskcenter）与本管理接口自身（/portforward）
+/// </summary>
+private static readonly string[] ReservedPathPrefixes =
+{
+"/dashboard", "/passport", "/home", "/api", "/account", "/static", "/wwwroot",
+"/post", "/comment", "/search", "/category", "/tag", "/author", "/login", "/register",
+"/short", "/signin-github", "/signin-google", "/_blazor", "/health", "/taskcenter",
+"/portforward", "/upload", "/file", "/share", "/subscribe", "/vedio", "/serviceunavailable"
+};
+
+/// <summary>
 /// 端口转发规则服务
 /// </summary>
 public IPortForwardRuleService PortForwardRuleService { get; set;}
@@ -63,6 +76,7 @@ r.Name,
 r.ListenPort,
 r.TargetHost,
 r.TargetPort,
+r.Path,
 r.Enabled,
 r.Remark,
 status.IsListening,
@@ -115,6 +129,32 @@ if (PortForwardRuleService.Any(r => r.ListenPort == cmd.ListenPort && r.Id!= cmd
 return ResultData(null, false, $"监听端口 {cmd.ListenPort} 已被其他规则占用，请更换！");
 }
 
+var path = cmd.Path?.Trim();
+if (string.IsNullOrEmpty(path))
+{
+path = null;
+}
+
+if (path!= null)
+{
+if (!path.StartsWith('/') || path.Length < 2 || path.Length > 128 || path.EndsWith('/') || path.Contains(' ') || path.Contains(".."))
+{
+return ResultData(null, false, "路径格式不正确：必须以 / 开头、长度 2-128、不能以 / 结尾、不能包含空格或 ..（如 /mcp）！");
+}
+
+var reserved = ReservedPathPrefixes.FirstOrDefault(p => path.Equals(p, StringComparison.OrdinalIgnoreCase) || path.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase));
+if (reserved!= null)
+{
+return ResultData(null, false, $"路径 {path} 与博客自身路由 {reserved} 冲突，属于保留前缀，不能用作转发路径！");
+}
+
+var usedPaths = PortForwardRuleService.GetQuery(r => r.Path!= null && r.Id!= cmd.Id).Select(r => r.Path).ToList();
+if (usedPaths.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+{
+return ResultData(null, false, $"路径 {path} 已被其他规则使用，请更换！");
+}
+}
+
 bool ok;
 if (cmd.Id > 0)
 {
@@ -123,6 +163,7 @@ rule.Name = cmd.Name.Trim();
 rule.ListenPort = cmd.ListenPort;
 rule.TargetHost = cmd.TargetHost.Trim();
 rule.TargetPort = cmd.TargetPort;
+rule.Path = path;
 rule.Enabled = cmd.Enabled;
 rule.Remark = cmd.Remark?.Trim();
 ok = PortForwardRuleService.SaveChanges() > 0;
@@ -140,6 +181,7 @@ Name = cmd.Name.Trim(),
 ListenPort = cmd.ListenPort,
 TargetHost = cmd.TargetHost.Trim(),
 TargetPort = cmd.TargetPort,
+Path = path,
 Enabled = cmd.Enabled,
 Remark = cmd.Remark?.Trim(),
 Status = Status.Available

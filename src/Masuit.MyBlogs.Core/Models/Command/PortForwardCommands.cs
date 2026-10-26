@@ -31,6 +31,11 @@ public class PortForwardRuleCommand
 	public int TargetPort { get; set; }
 
 	/// <summary>
+	/// 路径转发前缀（可空），如 /mcp；非空时博客该路径的 HTTP 请求剥前缀代理转发到目标，为空不启用
+	/// </summary>
+	public string Path { get; set; }
+
+	/// <summary>
 	/// 是否启用
 	/// </summary>
 	public bool Enabled { get; set; } = true;

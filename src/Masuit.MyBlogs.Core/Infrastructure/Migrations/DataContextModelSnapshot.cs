@@ -886,6 +886,10 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("Path")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("Remark")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");

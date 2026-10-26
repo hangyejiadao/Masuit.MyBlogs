@@ -30,6 +30,13 @@ public class PortForwardRule : BaseEntity
 	public int TargetPort { get; set; }
 
 	/// <summary>
+	/// 路径转发前缀（可空），如 /mcp。非空时博客收到该路径或其子路径的 HTTP 请求会剥掉此前缀、
+	/// 把剩余路径代理转发到目标主机端口；为空表示不启用路径转发，与 TCP 监听相互独立
+	/// </summary>
+	[MaxLength(128)]
+	public string Path { get; set; }
+
+	/// <summary>
 	/// 是否启用；启用后转发引擎会实际监听该端口
 	/// </summary>
 	public bool Enabled { get; set; } = true;

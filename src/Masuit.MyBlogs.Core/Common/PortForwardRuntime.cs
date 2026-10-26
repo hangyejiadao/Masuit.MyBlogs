@@ -1,8 +1,56 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 
 namespace Masuit.MyBlogs.Core.Common;
+
+/// <summary>
+/// 一条规则的运行时计数（活跃连接、累计连接、累计字节），TCP 转发与路径代理共用同一套计数
+/// </summary>
+public sealed class PortForwardCounters
+{
+	/// <summary>
+	/// 当前活跃连接数，由 Interlocked 维护
+	/// </summary>
+	public long ActiveConnections;
+
+	/// <summary>
+	/// 累计处理连接/请求数，由 Interlocked 维护
+	/// </summary>
+	public long TotalConnections;
+
+	/// <summary>
+	/// 累计转发字节数，由 Interlocked 维护
+	/// </summary>
+	public long TotalBytes;
+}
+
+/// <summary>
+/// 一条路径转发规则的运行时快照：博客侧的挂载前缀与代理目标，供代理中间件逐请求匹配
+/// </summary>
+public sealed class PortForwardPathTarget
+{
+	/// <summary>
+	/// 规则id
+	/// </summary>
+	public int RuleId { get; init; }
+
+	/// <summary>
+	/// 博客侧挂载前缀，如 /mcp；匹配时不区分大小写，要求段边界，转发时剥掉
+	/// </summary>
+	public string Path { get; init; }
+
+	/// <summary>
+	/// 目标主机：IP 或主机名
+	/// </summary>
+	public string TargetHost { get; init; }
+
+	/// <summary>
+	/// 目标端口
+	/// </summary>
+	public int TargetPort { get; init; }
+}
 
 /// <summary>
 /// 一条端口转发规则的运行时状态快照，供管理列表合并展示
@@ -48,9 +96,24 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	private const int ConnectTimeoutSeconds = 15;
 
 	/// <summary>
+	/// 路径代理专用 HttpClient 的名称：无超时（长连接流式响应靠请求取消令牌收尾）、不跟随重定向、不解压，保证代理透明
+	/// </summary>
+	public const string ProxyHttpClientName = "PortForwardProxy";
+
+	/// <summary>
 	/// 当前实际运行的监听，键为规则id
 	/// </summary>
 	private readonly ConcurrentDictionary<int, ActiveForward> _active = new();
+
+	/// <summary>
+	/// 每条规则的运行时计数，键为规则id；TCP 转发与路径代理共用，规则不在监听时（如只用路径代理）也能累计
+	/// </summary>
+	private readonly ConcurrentDictionary<int, PortForwardCounters> _counters = new();
+
+	/// <summary>
+	/// 当前生效的路径转发规则快照，按前缀长度降序排列（最长前缀优先）；Reload 时整体原子替换，中间件逐请求只读
+	/// </summary>
+	private volatile PortForwardPathTarget[] _pathTargets = [];
 
 	/// <summary>
 	/// 最近一次监听启动失败的说明，键为规则id；成功启动后清除
@@ -115,6 +178,17 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 					rules = service.GetQuery(r => r.Enabled).ToList();
 				}
 
+				_pathTargets = rules.Where(r => !string.IsNullOrWhiteSpace(r.Path))
+					.Select(r => new PortForwardPathTarget
+					{
+						RuleId = r.Id,
+						Path = r.Path.Trim(),
+						TargetHost = r.TargetHost,
+						TargetPort = r.TargetPort
+					})
+					.OrderByDescending(t => t.Path.Length)
+					.ToArray();
+
 				var desired = rules.ToDictionary(r => r.Id);
 				foreach (var ruleId in _active.Keys)
 				{
@@ -158,19 +232,54 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 			return new PortForwardStatus { StatusMessage = "已停用" };
 		}
 
-		if (_active.TryGetValue(rule.Id, out var forward))
+		var counters = GetCounters(rule.Id);
+		var status = new PortForwardStatus
 		{
-			return new PortForwardStatus
-			{
-				IsListening = true,
-				StatusMessage = "监听中",
-				ActiveConnections = Interlocked.Read(ref forward.ActiveConnections),
-				TotalConnections = Interlocked.Read(ref forward.TotalConnections),
-				TotalBytes = Interlocked.Read(ref forward.TotalBytes)
-			};
+			ActiveConnections = Interlocked.Read(ref counters.ActiveConnections),
+			TotalConnections = Interlocked.Read(ref counters.TotalConnections),
+			TotalBytes = Interlocked.Read(ref counters.TotalBytes)
+		};
+		if (_active.ContainsKey(rule.Id))
+		{
+			status.IsListening = true;
+			status.StatusMessage = "监听中";
+			return status;
 		}
 
-		return new PortForwardStatus { StatusMessage = _startErrors.TryGetValue(rule.Id, out var error) ? error : "未启动" };
+		status.StatusMessage = _startErrors.TryGetValue(rule.Id, out var error) ? error : "未启动";
+		return status;
+	}
+
+	/// <summary>
+	/// 取得一条规则的运行时计数（不存在则创建）；TCP 转发与路径代理共用
+	/// </summary>
+	/// <param name="ruleId"></param>
+	/// <returns></returns>
+	public PortForwardCounters GetCounters(int ruleId) => _counters.GetOrAdd(ruleId, static _ => new PortForwardCounters());
+
+	/// <summary>
+	/// 按请求路径匹配路径转发规则：路径等于规则前缀、或以「前缀 + /」开头（段边界）即命中，快照已按前缀长度降序排列，最长前缀优先；
+	/// 未命中返回 null。供代理中间件逐请求调用，只读快照、零分配
+	/// </summary>
+	/// <param name="requestPath">请求路径（不含查询串）</param>
+	/// <returns></returns>
+	public PortForwardPathTarget MatchPath(string requestPath)
+	{
+		if (string.IsNullOrEmpty(requestPath))
+		{
+			return null;
+		}
+
+		foreach (var target in _pathTargets)
+		{
+			if (requestPath.Equals(target.Path, StringComparison.OrdinalIgnoreCase)
+				|| requestPath.StartsWith(target.Path + "/", StringComparison.OrdinalIgnoreCase))
+			{
+				return target;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>
@@ -198,7 +307,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 			return;
 		}
 
-		var forward = new ActiveForward(rule, listener);
+		var forward = new ActiveForward(rule, listener, GetCounters(rule.Id));
 		_active[rule.Id] = forward;
 		_startErrors.TryRemove(rule.Id, out _);
 		forward.AcceptTask = AcceptLoopAsync(forward);
@@ -271,8 +380,8 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	/// <returns></returns>
 	private async Task HandleConnectionAsync(ActiveForward forward, TcpClient client)
 	{
-		Interlocked.Increment(ref forward.TotalConnections);
-		Interlocked.Increment(ref forward.ActiveConnections);
+		Interlocked.Increment(ref forward.Counters.TotalConnections);
+		Interlocked.Increment(ref forward.Counters.ActiveConnections);
 		using var clientScope = client;
 		using var remote = new TcpClient();
 		try
@@ -283,7 +392,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		catch (Exception ex)
 		{
 			logger.LogError(ex, "端口转发连接目标失败，规则={RuleId}，目标={TargetHost}:{TargetPort}", forward.Rule.Id, forward.Rule.TargetHost, forward.Rule.TargetPort);
-			Interlocked.Decrement(ref forward.ActiveConnections);
+			Interlocked.Decrement(ref forward.Counters.ActiveConnections);
 			return;
 		}
 
@@ -308,7 +417,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		}
 		finally
 		{
-			Interlocked.Decrement(ref forward.ActiveConnections);
+			Interlocked.Decrement(ref forward.Counters.ActiveConnections);
 		}
 	}
 
@@ -332,7 +441,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 			}
 
 			await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-			Interlocked.Add(ref forward.TotalBytes, read);
+			Interlocked.Add(ref forward.Counters.TotalBytes, read);
 		}
 	}
 
@@ -341,7 +450,8 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	/// </summary>
 	/// <param name="rule"></param>
 	/// <param name="listener"></param>
-	private sealed class ActiveForward(PortForwardRule rule, TcpListener listener)
+	/// <param name="counters">与路径代理共用的运行时计数</param>
+	private sealed class ActiveForward(PortForwardRule rule, TcpListener listener, PortForwardCounters counters)
 	{
 		/// <summary>
 		/// 监听对应的规则快照
@@ -369,19 +479,9 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		public Task AcceptTask { get; set; } = Task.CompletedTask;
 
 		/// <summary>
-		/// 当前活跃连接数，由 Interlocked 维护
+		/// 运行时计数，与同规则的路径代理共用
 		/// </summary>
-		public long ActiveConnections;
-
-		/// <summary>
-		/// 累计接受连接数，由 Interlocked 维护
-		/// </summary>
-		public long TotalConnections;
-
-		/// <summary>
-		/// 累计转发字节数（双向合计），由 Interlocked 维护
-		/// </summary>
-		public long TotalBytes;
+		public PortForwardCounters Counters { get; } = counters;
 
 		/// <summary>
 		/// 停止监听：取消全部连接处理、关闭套接字并等待接受循环退出
@@ -416,6 +516,14 @@ public static class PortForwardServiceExtension
 	{
 		services.AddSingleton<PortForwardRuntime>();
 		services.AddHostedService(sp => sp.GetRequiredService<PortForwardRuntime>());
+		services.AddHttpClient(PortForwardRuntime.ProxyHttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+			.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+			{
+				AllowAutoRedirect = false,
+				UseCookies = false,
+				AutomaticDecompression = DecompressionMethods.None,
+				PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+			});
 		return services;
 	}
 }

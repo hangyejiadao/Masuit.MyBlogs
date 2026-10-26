@@ -19,6 +19,7 @@ import "animate.css";
 // vxe-table
 import VxeUIAll from "vxe-pc-ui";
 import "vxe-pc-ui/es/style.css";
+import { VxeUI } from "@vxe-ui/core";
 import XEUtils from 'xe-utils'
 
 import VxeUITable from "vxe-table";
@@ -61,7 +62,7 @@ app.config.globalProperties.$baseURL = globalConfig.baseURL;
 app.config.globalProperties.$timeOut = globalConfig.timeOut;
 app.config.globalProperties.$Max_KeepAlive = globalConfig.Max_KeepAlive;
 app.config.globalProperties.$dayjs = dayjs;
-VxeUIAll.formats.add('formatDate', {
+VxeUI.formats.add('formatDate', {
   cellFormatMethod({ cellValue }, format?: string) {
     return XEUtils.toDateString(cellValue, format || 'yyyy-MM-dd HH:mm:ss')
   }

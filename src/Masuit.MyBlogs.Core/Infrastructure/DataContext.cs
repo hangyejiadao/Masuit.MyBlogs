@@ -27,8 +27,10 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<ExternalLogin>().HasIndex(e => new { e.Provider, e.ProviderKey }).IsUnique();
 
         modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.Licenses).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ApplicationInfo>().HasMany(e => e.PricePlans).WithOne(e => e.Application).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ApplicationInfo>().HasIndex(e => e.AppKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserInfoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppLicense>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
 
@@ -159,6 +161,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<ApplicationInfo> ApplicationInfo { get; set; }
 
     public virtual DbSet<AppLicense> AppLicense { get; set; }
+
+    public virtual DbSet<AppPricePlan> AppPricePlan { get; set; }
 
     public virtual DbSet<Donate> Donate { get; set; }
 

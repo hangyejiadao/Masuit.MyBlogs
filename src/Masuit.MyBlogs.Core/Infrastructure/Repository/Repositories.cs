@@ -51,3 +51,5 @@ public sealed partial class ExternalLoginRepository : BaseRepository<ExternalLog
 public sealed partial class ApplicationInfoRepository : BaseRepository<ApplicationInfo>, IApplicationInfoRepository;
 
 public sealed partial class AppLicenseRepository : BaseRepository<AppLicense>, IAppLicenseRepository;
+
+public sealed partial class AppPricePlanRepository : BaseRepository<AppPricePlan>, IAppPricePlanRepository;

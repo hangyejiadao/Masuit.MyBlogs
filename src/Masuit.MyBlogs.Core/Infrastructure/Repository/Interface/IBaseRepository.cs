@@ -342,3 +342,5 @@ public partial interface IExternalLoginRepository : IBaseRepository<ExternalLogi
 public partial interface IApplicationInfoRepository : IBaseRepository<ApplicationInfo>;
 
 public partial interface IAppLicenseRepository : IBaseRepository<AppLicense>;
+
+public partial interface IAppPricePlanRepository : IBaseRepository<AppPricePlan>;

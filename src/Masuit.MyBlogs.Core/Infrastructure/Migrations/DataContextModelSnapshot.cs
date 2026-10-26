@@ -214,6 +214,12 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<decimal?>("PaidPrice")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("PricePlanId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Remark")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -236,9 +242,46 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.HasIndex("LicenseKey")
                         .IsUnique();
 
+                    b.HasIndex("PricePlanId");
+
                     b.HasIndex("UserInfoId");
 
                     b.ToTable("AppLicense");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppPricePlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ApplicationInfoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ValidityDays")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationInfoId");
+
+                    b.ToTable("AppPricePlan");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", b =>
@@ -263,8 +306,16 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("PackageUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 
@@ -1344,6 +1395,11 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.AppPricePlan", "PricePlan")
+                        .WithMany()
+                        .HasForeignKey("PricePlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Masuit.MyBlogs.Core.Models.Entity.UserInfo", "User")
                         .WithMany()
                         .HasForeignKey("UserInfoId")
@@ -1352,7 +1408,20 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
 
                     b.Navigation("Application");
 
+                    b.Navigation("PricePlan");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppPricePlan", b =>
+                {
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", "Application")
+                        .WithMany("PricePlans")
+                        .HasForeignKey("ApplicationInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
@@ -1532,6 +1601,8 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", b =>
                 {
                     b.Navigation("Licenses");
+
+                    b.Navigation("PricePlans");
                 });
 
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>

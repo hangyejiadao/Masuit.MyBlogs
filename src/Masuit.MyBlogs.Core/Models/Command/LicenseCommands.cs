@@ -24,6 +24,52 @@ public class ApplicationInfoCommand
 	/// 应用说明
 	/// </summary>
 	public string Description { get; set; }
+
+	/// <summary>
+	/// 当前版本号
+	/// </summary>
+	public string Version { get; set; }
+
+	/// <summary>
+	/// 安装包下载地址
+	/// </summary>
+	public string PackageUrl { get; set; }
+}
+
+/// <summary>
+/// 价格方案保存参数（Id 为 0 表示新建）
+/// </summary>
+public class AppPricePlanCommand
+{
+	/// <summary>
+	/// 方案id，0 表示新建
+	/// </summary>
+	public int Id { get; set; }
+
+	/// <summary>
+	/// 所属应用id
+	/// </summary>
+	public int ApplicationInfoId { get; set; }
+
+	/// <summary>
+	/// 方案名称
+	/// </summary>
+	public string Name { get; set; }
+
+	/// <summary>
+	/// 方案价格（元）
+	/// </summary>
+	public decimal Price { get; set; }
+
+	/// <summary>
+	/// 有效天数，0 表示永久
+	/// </summary>
+	public int ValidityDays { get; set; }
+
+	/// <summary>
+	/// 排序值，越小越靠前
+	/// </summary>
+	public int Sort { get; set; }
 }
 
 /// <summary>
@@ -45,6 +91,11 @@ public class AppLicenseCommand
 	/// 被授权的博客用户id（用户管理中的普通用户）
 	/// </summary>
 	public int UserInfoId { get; set; }
+
+	/// <summary>
+	/// 购买的价格方案id，可空；选了方案时成交价取方案价、到期日按方案天数从生效日起算
+	/// </summary>
+	public int? PricePlanId { get; set; }
 
 	/// <summary>
 	/// 授权码，可空，空时自动生成

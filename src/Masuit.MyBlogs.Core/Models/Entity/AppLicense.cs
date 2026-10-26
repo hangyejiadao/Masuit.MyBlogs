@@ -27,6 +27,21 @@ public class AppLicense : BaseEntity
 	public virtual UserInfo User { get; set; }
 
 	/// <summary>
+	/// 购买的价格方案id，可空（手工签发、未选方案时为空）
+	/// </summary>
+	public int? PricePlanId { get; set; }
+
+	/// <summary>
+	/// 购买的价格方案
+	/// </summary>
+	public virtual AppPricePlan PricePlan { get; set; }
+
+	/// <summary>
+	/// 成交价快照：签发时的方案价格，方案事后改价不影响已签发授权；未选方案时为空
+	/// </summary>
+	public decimal? PaidPrice { get; set; }
+
+	/// <summary>
 	/// 授权码，创建时不填则自动生成
 	/// </summary>
 	[Required, MaxLength(64)]

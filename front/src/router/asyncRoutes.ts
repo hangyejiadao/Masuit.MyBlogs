@@ -425,6 +425,49 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
     component: () => import("@/views/user/loginrecord.vue"),
   },
   {
+    path: "/license",
+    name: "license",
+    meta: {
+      roles: [],
+      title: "授权管理",
+      icon: "verified_user",
+      isOpen: false,
+    },
+    component: LayoutComponent,
+    children: [
+      {
+        path: "applications",
+        name: "license-applications",
+        meta: {
+          roles: [],
+          title: "应用管理",
+          icon: "apps",
+        },
+        component: () => import("@/views/license/Applications.vue"),
+      },
+      {
+        path: "customers",
+        name: "license-customers",
+        meta: {
+          roles: [],
+          title: "客户管理",
+          icon: "people",
+        },
+        component: () => import("@/views/license/Customers.vue"),
+      },
+      {
+        path: "list",
+        name: "license-list",
+        meta: {
+          roles: [],
+          title: "License 管理",
+          icon: "vpn_key",
+        },
+        component: () => import("@/views/license/Index.vue"),
+      },
+    ],
+  },
+  {
     path: "/:pathMatch(.*)*", // Vue Router 4 的通配符语法
     redirect: "/NoFound404",
     meta: {

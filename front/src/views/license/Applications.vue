@@ -41,10 +41,10 @@
           <td class="text-center">{{ row.PlanCount }}</td>
           <td class="text-center">{{ row.VersionCount }}</td>
           <td class="text-center">
-            <q-btn flat dense size="sm" color="indigo" label="版本管理" @click="openVersions(row)" />
-            <q-btn flat dense size="sm" color="teal" label="价格方案" @click="openPlans(row)" />
-            <q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" />
-            <q-btn flat dense size="sm" color="negative" label="删除" @click="askDelete(row)" />
+            <q-btn flat class="app-action-btn" color="indigo" label="版本管理" @click="openVersions(row)" />
+            <q-btn flat class="app-action-btn" color="teal" label="价格方案" @click="openPlans(row)" />
+            <q-btn flat class="app-action-btn" color="primary" label="编辑" @click="openEdit(row)" />
+            <q-btn flat class="app-action-btn" color="negative" label="删除" @click="askDelete(row)" />
           </td>
         </tr>
         <tr v-if="!loading && rows.length === 0">
@@ -512,3 +512,11 @@ const doDeleteVersion = async () => {
 
 onMounted(load)
 </script>
+
+<style scoped>
+/* 应用列表操作列：放大动作链接字号并留足点击区，避免小字难点 */
+.app-action-btn {
+  font-size: 15px;
+  padding: 4px 10px;
+}
+</style>

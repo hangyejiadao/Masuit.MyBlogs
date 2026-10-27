@@ -347,4 +347,6 @@ public partial interface IAppPricePlanRepository : IBaseRepository<AppPricePlan>
 
 public partial interface IAppVersionRepository : IBaseRepository<AppVersion>;
 
+public partial interface IBrakeLeaderboardEntryRepository : IBaseRepository<BrakeLeaderboardEntry>;
+
 public partial interface IPortForwardRuleRepository : IBaseRepository<PortForwardRule>;

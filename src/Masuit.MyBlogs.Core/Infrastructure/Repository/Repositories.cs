@@ -56,4 +56,6 @@ public sealed partial class AppPricePlanRepository : BaseRepository<AppPricePlan
 
 public sealed partial class AppVersionRepository : BaseRepository<AppVersion>, IAppVersionRepository;
 
+public sealed partial class BrakeLeaderboardEntryRepository : BaseRepository<BrakeLeaderboardEntry>, IBrakeLeaderboardEntryRepository;
+
 public sealed partial class PortForwardRuleRepository : BaseRepository<PortForwardRule>, IPortForwardRuleRepository;

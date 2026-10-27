@@ -219,6 +219,7 @@ function completeRun(snapshot) {
     seconds.textContent = 's';
     elements['result-time'].append(seconds);
     elements['result-copy'].textContent = `反应 ${record.reaction.toFixed(3)} s · 峰值力度 ${Math.round(snapshot.peakForce)} N · ${saved ? '成绩已记录' : '本次成绩未能保存'}`;
+    submitScoreToLeaderboard(record);
     audio.beep(523, 0.18);
     audio.beep(659, 0.18, 0.13);
     audio.beep(784, 0.3, 0.26);
@@ -321,35 +322,76 @@ function render(snapshot) {
   audio.update(snapshot);
 }
 
-function renderRecords() {
-  const list = $('records-list');
-  list.replaceChildren();
-  if (!scores.length) {
-    const empty = document.createElement('li');
-    empty.className = 'empty-records';
-    const icon = document.createElement('b'); icon.textContent = '—';
-    empty.append(icon, document.createTextNode('你的第一条纪录，还在起跑线上。'));
-    list.append(empty);
-    return;
+function submitScoreToLeaderboard(record) {
+  const copyElement = elements['result-copy'];
+  const copyBefore = copyElement.textContent;
+  fetch('/Shache/Submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ time: record.time, reaction: record.reaction, distance: record.distance, peakForce: record.peakForce }),
+  }).then(response => (response.ok ? response.json() : null)).then(data => {
+    // 仅当结算文案还是本局的（用户还没开始下一局）且名次进前 20 时才追加上榜提示
+    if (data && Number.isFinite(data.rank) && data.rank >= 1 && data.rank <= 20 && copyElement.textContent === copyBefore) {
+      copyElement.textContent = `${copyBefore} · 已上榜第 ${data.rank} 名`;
+    }
+  }).catch(() => { /* 提交失败静默处理，不影响游戏与本地记录 */ });
+}
+
+let leaderboardRequest = 0;
+
+function leaderboardStatusRow(text) {
+  const item = document.createElement('li');
+  item.className = 'empty-records';
+  const icon = document.createElement('b'); icon.textContent = '—';
+  item.append(icon, document.createTextNode(text));
+  return item;
+}
+
+function buildLeaderboardRow(entry, clientIp) {
+  const row = document.createElement('li'); row.className = 'record-row';
+  const isMe = Boolean(clientIp) && entry.ip === clientIp;
+  if (isMe) row.classList.add('is-me');
+  const rank = document.createElement('span'); rank.className = 'record-rank'; rank.textContent = String(entry.rank).padStart(2, '0');
+  const ip = document.createElement('span'); ip.className = 'record-ip'; ip.textContent = entry.ip || '未知';
+  if (isMe) {
+    const you = document.createElement('em'); you.className = 'record-you'; you.textContent = '你';
+    ip.append(you);
   }
-  scores.forEach((score, index) => {
-    const row = document.createElement('li'); row.className = 'record-row';
-    const rank = document.createElement('span'); rank.className = 'record-rank'; rank.textContent = String(index + 1).padStart(2, '0');
-    const date = document.createElement('span'); date.className = 'record-date';
-    date.textContent = new Date(score.date).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
-    const details = document.createElement('small'); details.textContent = `反应 ${score.reaction.toFixed(3)} s · ${score.distance.toFixed(1)} m`;
-    date.append(details);
-    const time = document.createElement('span'); time.className = 'record-score'; time.textContent = score.time.toFixed(3);
-    const unit = document.createElement('small'); unit.textContent = 's'; time.append(unit);
-    row.append(rank, date, time); list.append(row);
-  });
+  const region = document.createElement('span'); region.className = 'record-region'; region.textContent = entry.region || '未知';
+  const details = document.createElement('small'); details.textContent = `反应 ${Number(entry.reaction).toFixed(3)} s · ${Number(entry.distance).toFixed(1)} m`;
+  region.append(details);
+  const time = document.createElement('span'); time.className = 'record-score'; time.textContent = Number(entry.time).toFixed(3);
+  const unit = document.createElement('small'); unit.textContent = 's'; time.append(unit);
+  row.append(rank, ip, region, time);
+  return row;
+}
+
+async function renderLeaderboard() {
+  const list = $('records-list');
+  const requestId = ++leaderboardRequest;
+  list.replaceChildren(leaderboardStatusRow('正在加载全球排行榜…'));
+  try {
+    const response = await fetch('/Shache/Top', { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (requestId !== leaderboardRequest) return;
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    if (!entries.length) {
+      list.replaceChildren(leaderboardStatusRow('暂无记录，来跑出全网第一条成绩。'));
+      return;
+    }
+    list.replaceChildren(...entries.map(entry => buildLeaderboardRow(entry, data.clientIp)));
+  } catch {
+    if (requestId !== leaderboardRequest) return;
+    list.replaceChildren(leaderboardStatusRow('排行榜加载失败，请稍后再试。'));
+  }
 }
 
 function openDialog(id) {
   if ($('records-dialog').open || $('help-dialog').open) return;
   returnToRunning = RUNNING.has(game.phase) && !game.paused;
   if (returnToRunning) pause(true);
-  if (id === 'records-dialog') renderRecords();
+  if (id === 'records-dialog') renderLeaderboard();
   $(id).showModal();
 }
 

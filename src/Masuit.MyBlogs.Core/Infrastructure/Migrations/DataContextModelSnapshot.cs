@@ -356,6 +356,53 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("ApplicationInfo");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.BrakeLeaderboardEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<double>("Distance")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Ip")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<double>("PeakForce")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Reaction")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("Time")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Ip")
+                        .IsUnique();
+
+                    b.ToTable("BrakeLeaderboardEntry");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.Category", b =>
                 {
                     b.Property<int>("Id")

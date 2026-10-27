@@ -29,6 +29,8 @@ public sealed partial class AppVersionService(IBaseRepository<AppVersion> reposi
 
 public sealed partial class PortForwardRuleService(IBaseRepository<PortForwardRule> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<PortForwardRule>(repository, searchEngine, searcher), IPortForwardRuleService;
 
+public sealed partial class BrakeLeaderboardEntryService(IBaseRepository<BrakeLeaderboardEntry> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<BrakeLeaderboardEntry>(repository, searchEngine, searcher), IBrakeLeaderboardEntryService;
+
 public sealed partial class MiscService(IBaseRepository<Misc> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Misc>(repository, searchEngine, searcher), IMiscService;
 
 public sealed partial class NoticeService(IBaseRepository<Notice> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Notice>(repository, searchEngine, searcher), INoticeService;

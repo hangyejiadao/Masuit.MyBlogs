@@ -26,6 +26,8 @@ public partial interface IAppVersionService : IBaseService<AppVersion>;
 
 public partial interface IPortForwardRuleService : IBaseService<PortForwardRule>;
 
+public partial interface IBrakeLeaderboardEntryService : IBaseService<BrakeLeaderboardEntry>;
+
 public partial interface IMiscService : IBaseService<Misc>;
 
 public partial interface INoticeService : IBaseService<Notice>;

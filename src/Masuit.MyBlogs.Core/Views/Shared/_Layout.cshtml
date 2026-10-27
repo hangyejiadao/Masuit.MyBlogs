@@ -166,6 +166,18 @@
           </li>
         }
 
+        <li>
+          <a href="/Store">软件购买</a>
+        </li>
+        if (currentUser != null) {
+          <li>
+            <a href="/Store/MyOrders">我的订单</a>
+          </li>
+        }
+        <li>
+          <a> | </a>
+        </li>
+
         foreach (var m in menus) {
           if (m.MenuType == MenuType.SubMenu) {
             <li class="has-children">

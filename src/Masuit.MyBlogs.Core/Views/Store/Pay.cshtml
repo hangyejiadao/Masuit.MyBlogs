@@ -1,0 +1,80 @@
+@using Masuit.MyBlogs.Core.Models.Entity
+@using Masuit.MyBlogs.Core.Models.Enum
+@model AppOrder
+@{
+  ViewBag.Title = "订单支付";
+  var license = ViewBag.IssuedLicense as AppLicense;
+  var alipayConfigured = ViewBag.AlipayConfigured is bool b && b;
+  string StatusText(AppOrderStatus s) => s switch { AppOrderStatus.Paid => "已支付", AppOrderStatus.Closed => "已关闭", _ => "待支付" };
+  string ValidityText(int days) => days > 0 ? days + " 天" : "永久";
+  string ExpireText(AppLicense l) => l.ExpireDate >= l.StartDate.AddYears(99) ? "永久" : l.ExpireDate.ToString("yyyy-MM-dd");
+}
+<style>
+  .store-head { margin: 16px 0 6px; }
+  .pay-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  .pay-table th, .pay-table td { border-bottom: 1px solid #e3eaf2; padding: 10px 8px; text-align: left; }
+  .pay-table th { width: 130px; color: #555; font-weight: 600; }
+  .pay-amount { color: #d9534f; font-size: 1.3rem; font-weight: 700; }
+  .store-btn { padding: 11px 30px; border: none; border-radius: 6px; background: #1677ff; color: #fff; cursor: pointer; font-size: 1.05rem; }
+  .store-btn:hover { background: #0f5fd0; }
+  .pay-warn { border: 1px solid #f0c36d; background: #fdf6e3; color: #7a5b12; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .pay-ok { border: 1px solid #9ccc9c; background: #eef7ee; color: #27632a; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .pay-key { font-family: monospace; word-break: break-all; background: #fff; border: 1px dashed #9ccc9c; border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+</style>
+<h2 class="store-head">订单支付</h2>
+
+@if (TempData["StoreError"] != null)
+{
+  <div class="pay-warn">@TempData["StoreError"]</div>
+}
+
+<table class="pay-table">
+  <tr><th>订单号</th><td>@Model.OrderNo</td></tr>
+  <tr><th>应用</th><td>@(Model.Application?.Name ?? "-")</td></tr>
+  <tr><th>价格方案</th><td>@Model.PlanName（有效期：@ValidityText(Model.PlanValidityDays)）</td></tr>
+  <tr><th>应付金额</th><td><span class="pay-amount">¥@Model.Amount.ToString("0.00")</span></td></tr>
+  <tr><th>订单状态</th><td>@StatusText(Model.OrderStatus)</td></tr>
+  <tr><th>下单时间</th><td>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td></tr>
+  @if (Model.PaidAt.HasValue)
+  {
+    <tr><th>支付时间</th><td>@Model.PaidAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</td></tr>
+  }
+  @if (!string.IsNullOrWhiteSpace(Model.AlipayTradeNo))
+  {
+    <tr><th>支付宝交易号</th><td>@Model.AlipayTradeNo</td></tr>
+  }
+</table>
+
+@if (Model.OrderStatus == AppOrderStatus.Paid)
+{
+  <div class="pay-ok">
+    <strong>支付成功，授权已自动发放到您的账号。</strong>
+    @if (license != null)
+    {
+      <div>生效日期：@license.StartDate.ToString("yyyy-MM-dd") · 到期：@ExpireText(license)</div>
+      <div class="pay-key">授权码：@license.LicenseKey</div>
+    }
+    <div style="margin-top:10px"><a href="/Store/MyOrders">去「我的订单」查看</a></div>
+  </div>
+}
+else if (Model.OrderStatus == AppOrderStatus.Closed)
+{
+  <div class="pay-warn">该订单已关闭，无法继续支付。如需购买，请返回应用详情重新下单。</div>
+  <p><a href="/Store/Detail/@Model.ApplicationInfoId">返回应用详情</a></p>
+}
+else if (alipayConfigured)
+{
+  <form method="post" action="/Store/PayNow/@Model.Id">
+    @Html.AntiForgeryToken()
+    <button type="submit" class="store-btn">支付宝支付 ¥@Model.Amount.ToString("0.00")</button>
+  </form>
+  <p style="color:#777;margin-top:10px">点击后将跳转到支付宝收银台完成付款；支付成功后请勿重复付款，授权会自动发放，可在「我的订单」中查看。</p>
+}
+else
+{
+  <div class="pay-warn">
+    <strong>支付通道尚未配置，请联系管理员。</strong><br />
+    您的订单已保留为「待支付」，管理员完成支付宝配置后，您可以在「我的订单」中找到这笔订单继续支付，无需重新下单。
+  </div>
+  <p><a href="/Store/MyOrders">去「我的订单」查看这笔订单</a></p>
+}

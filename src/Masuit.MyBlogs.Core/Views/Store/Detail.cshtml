@@ -1,0 +1,101 @@
+@using Masuit.MyBlogs.Core.Models.DTO
+@using Masuit.MyBlogs.Core.Models.Entity
+@using Masuit.MyBlogs.Core.Models.Enum
+@using Masuit.MyBlogs.Core.Models.ViewModel
+@using Masuit.Tools.AspNetCore.Extensions
+@model ApplicationInfo
+@{
+  ViewBag.Title = Model.Name + " - 软件购买";
+  var plans = ViewBag.Plans as List<AppPricePlan> ?? new List<AppPricePlan>();
+  var versions = ViewBag.Versions as List<AppVersion> ?? new List<AppVersion>();
+  var currentUser = Context.Session.Get<UserInfoDto>(SessionKey.UserInfo);
+  string ValidityText(int days) => days > 0 ? days + " 天" : "永久";
+}
+<style>
+  .store-head { margin: 16px 0 6px; }
+  .store-desc { color: #444; white-space: pre-wrap; word-break: break-word; margin-bottom: 18px; }
+  .store-section { margin-bottom: 24px; }
+  .store-section h3 { font-size: 1.1rem; margin-bottom: 10px; }
+  .store-plan { display: flex; align-items: center; gap: 10px; border: 1px solid #e3eaf2; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; background: #fff; }
+  .store-plan:hover { border-color: #1566b6; }
+  .store-plan .pname { font-weight: 600; }
+  .store-plan .pvalid { color: #777; }
+  .store-plan .pprice { margin-left: auto; color: #d9534f; font-size: 1.15rem; font-weight: 700; }
+  .store-amount { font-size: 1.1rem; margin: 14px 0; }
+  .store-amount strong { color: #d9534f; font-size: 1.5rem; }
+  .store-btn { padding: 10px 28px; border: none; border-radius: 6px; background: #1566b6; color: #fff; cursor: pointer; font-size: 1rem; }
+  .store-btn:hover { background: #0f5294; }
+  .store-alert { border: 1px solid #f0c36d; background: #fdf6e3; color: #7a5b12; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .store-ver { border-bottom: 1px solid #eef2f6; padding: 8px 0; }
+  .store-ver .vlog { color: #666; white-space: pre-wrap; font-size: .92rem; }
+  .store-login-tip { color: #777; margin-top: 8px; }
+</style>
+<h2 class="store-head">@Model.Name</h2>
+<p class="store-desc">@(string.IsNullOrWhiteSpace(Model.Description) ? "暂无说明" : Model.Description)</p>
+
+@if (TempData["StoreError"] != null)
+{
+  <div class="store-alert">@TempData["StoreError"]</div>
+}
+
+<div class="store-section">
+  <h3>选择价格方案</h3>
+  @if (!plans.Any())
+  {
+    <p>该软件暂无可购买的价格方案，请联系管理员。</p>
+  }
+  else
+  {
+    <form method="post" action="/Store/Buy">
+      @Html.AntiForgeryToken()
+      @for (var i = 0; i < plans.Count; i++)
+      {
+        var plan = plans[i];
+        <label class="store-plan">
+          <input type="radio" name="planId" value="@plan.Id" data-price="@plan.Price.ToString("0.00")" @(i == 0 ? "checked" : "") />
+          <span class="pname">@plan.Name</span>
+          <span class="pvalid">有效期：@ValidityText(plan.ValidityDays)</span>
+          <span class="pprice">¥@plan.Price.ToString("0.00")</span>
+        </label>
+      }
+      <p class="store-amount">应付金额：<strong id="storeAmount">¥@plans[0].Price.ToString("0.00")</strong></p>
+      <button type="submit" class="store-btn">立即购买</button>
+      @if (currentUser == null)
+      {
+        <p class="store-login-tip">购买前需要先登录，点击「立即购买」将跳转到登录页，登录后回到商店重新下单即可。</p>
+      }
+    </form>
+  }
+</div>
+
+@if (versions.Any())
+{
+  <div class="store-section">
+    <h3>版本与下载</h3>
+    @foreach (var v in versions)
+    {
+      <div class="store-ver">
+        <div>
+          <strong>@v.Version</strong>
+          · <a href="@v.PackageUrl" target="_blank" rel="noopener">下载安装包</a>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(v.ChangeLog))
+        {
+          <div class="vlog">@v.ChangeLog</div>
+        }
+      </div>
+    }
+  </div>
+}
+
+<script>
+  (function () {
+    var radios = document.querySelectorAll('input[name="planId"]');
+    var amount = document.getElementById('storeAmount');
+    radios.forEach(function (r) {
+      r.addEventListener('change', function () {
+        if (r.checked && amount) amount.textContent = '¥' + r.getAttribute('data-price');
+      });
+    });
+  })();
+</script>

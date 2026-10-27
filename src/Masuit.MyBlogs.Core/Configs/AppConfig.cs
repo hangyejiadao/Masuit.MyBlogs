@@ -34,4 +34,9 @@ public class AppConfig
     /// 第三方单点登录配置（GitHub / Google）
     /// </summary>
     public static OAuthConfig OAuth { get; set; } = new();
+
+    /// <summary>
+    /// 支付宝支付配置（软件购买商店收款用）
+    /// </summary>
+    public static AlipayConfig Alipay { get; set; } = new();
 }

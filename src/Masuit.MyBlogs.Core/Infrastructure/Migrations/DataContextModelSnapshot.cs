@@ -249,6 +249,80 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("AppLicense");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppOrder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AlipayTradeNo")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("ApplicationInfoId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("IssuedLicenseId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OrderNo")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("OrderStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("PlanPrice")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("PlanValidityDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PricePlanId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserInfoId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationInfoId");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending();
+
+                    b.HasIndex("IssuedLicenseId");
+
+                    b.HasIndex("OrderNo")
+                        .IsUnique();
+
+                    b.HasIndex("PricePlanId");
+
+                    b.HasIndex("UserInfoId");
+
+                    b.ToTable("AppOrder");
+                });
+
             modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppPricePlan", b =>
                 {
                     b.Property<int>("Id")
@@ -1531,6 +1605,40 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Application");
+
+                    b.Navigation("PricePlan");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.AppOrder", b =>
+                {
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.ApplicationInfo", "Application")
+                        .WithMany()
+                        .HasForeignKey("ApplicationInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.AppLicense", "IssuedLicense")
+                        .WithMany()
+                        .HasForeignKey("IssuedLicenseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.AppPricePlan", "PricePlan")
+                        .WithMany()
+                        .HasForeignKey("PricePlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Masuit.MyBlogs.Core.Models.Entity.UserInfo", "User")
+                        .WithMany()
+                        .HasForeignKey("UserInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+
+                    b.Navigation("IssuedLicense");
 
                     b.Navigation("PricePlan");
 

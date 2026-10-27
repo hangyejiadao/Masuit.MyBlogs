@@ -24,6 +24,8 @@ public partial interface IAppPricePlanService : IBaseService<AppPricePlan>;
 
 public partial interface IAppVersionService : IBaseService<AppVersion>;
 
+public partial interface IAppOrderService : IBaseService<AppOrder>;
+
 public partial interface IPortForwardRuleService : IBaseService<PortForwardRule>;
 
 public partial interface IBrakeLeaderboardEntryService : IBaseService<BrakeLeaderboardEntry>;

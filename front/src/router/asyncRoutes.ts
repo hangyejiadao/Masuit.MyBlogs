@@ -455,6 +455,16 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
         },
         component: () => import("@/views/license/Index.vue"),
       },
+      {
+        path: "orders",
+        name: "license-orders",
+        meta: {
+          roles: [],
+          title: "订单管理",
+          icon: "receipt_long",
+        },
+        component: () => import("@/views/license/Orders.vue"),
+      },
     ],
   },
   {

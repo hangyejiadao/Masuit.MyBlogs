@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using Masuit.Tools.AspNetCore.ModelBinder;
 using EFCoreSecondLevelCacheInterceptor;
+using Essensoft.Paylinks.Alipay.Client.Extensions;
 
 namespace Masuit.MyBlogs.Core;
 
@@ -55,6 +56,7 @@ public class Startup
             AppConfig.TrueClientIPHeader = configuration[nameof(AppConfig.TrueClientIPHeader)] ?? "CF-Connecting-IP";
             AppConfig.EnableIPDirect = bool.Parse(configuration[nameof(AppConfig.EnableIPDirect)] ?? "false");
             configuration.Bind("OAuth", AppConfig.OAuth);
+            configuration.Bind("Alipay", AppConfig.Alipay);
             configuration.Bind("Imgbed:Gitlabs", AppConfig.GitlabConfigs);
             configuration.AddToMasuitTools();
         }
@@ -93,6 +95,7 @@ public class Startup
         });
         services.AddSession().AddAntiforgery(); //注入Session
         services.AddExternalLoginAuthentication(Configuration); //第三方单点登录（GitHub / Google），凭据未配置时自动禁用
+        services.AddAlipayClient(); //支付宝支付客户端（软件购买商店），凭据走 AppConfig.Alipay 按请求传入，未配置时不发起支付
         services.AddResponseCache();
         services.AddHangfireServer().AddHangfire((serviceProvider, configuration) =>
         {

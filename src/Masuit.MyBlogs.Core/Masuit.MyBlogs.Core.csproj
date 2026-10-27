@@ -47,6 +47,9 @@
         <PackageReference Include="Dispose.Scope.AspNetCore" Version="1.0.0" />
         <PackageReference Include="EFCoreSecondLevelCacheInterceptor" Version="5.5.1" />
         <PackageReference Include="EntityFrameworkCore.Exceptions.PostgreSQL" Version="10.0.1" />
+        <PackageReference Include="Essensoft.Paylinks.Alipay.Client" Version="5.0.4" />
+        <PackageReference Include="Essensoft.Paylinks.Alipay.Mvc" Version="5.0.4" />
+        <PackageReference Include="Essensoft.Paylinks.Alipay.Payments" Version="5.0.4" />
         <PackageReference Include="FreeRedis" Version="1.5.5" />
         <PackageReference Include="Hangfire" Version="1.8.25" />
         <PackageReference Include="Hangfire.MemoryStorage" Version="1.8.1.2" />

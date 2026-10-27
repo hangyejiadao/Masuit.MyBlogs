@@ -1,0 +1,40 @@
+@using Masuit.MyBlogs.Core.Models.Entity
+@using Masuit.MyBlogs.Core.Models.Enum
+@model List<ApplicationInfo>
+@{
+  ViewBag.Title = "软件购买";
+}
+<style>
+  .store-head { margin: 16px 0 6px; }
+  .store-tip { color: #666; margin-bottom: 18px; }
+  .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .store-card { border: 1px solid #e3eaf2; border-radius: 10px; padding: 18px; background: #fff; display: flex; flex-direction: column; gap: 8px; }
+  .store-card h3 { margin: 0; font-size: 1.25rem; }
+  .store-desc { color: #555; flex: 1; white-space: pre-wrap; word-break: break-word; }
+  .store-meta { color: #1566b6; font-weight: 600; }
+  .store-btn { display: inline-block; text-align: center; padding: 9px 18px; border-radius: 6px; background: #1566b6; color: #fff !important; text-decoration: none; }
+  .store-btn:hover { background: #0f5294; }
+  .store-empty { color: #888; padding: 30px 0; }
+</style>
+<h2 class="store-head">软件购买</h2>
+<p class="store-tip">选择需要的软件并在线支付，支付成功后授权会自动发放到您的账号，可在「我的订单」中查看授权码与到期时间。</p>
+@if (!Model.Any())
+{
+  <p class="store-empty">暂无在售软件，请稍后再来。</p>
+}
+else
+{
+  <div class="store-grid">
+    @foreach (var app in Model)
+    {
+      var plans = app.PricePlans?.Where(p => p.Status == Status.Available).ToList() ?? new List<AppPricePlan>();
+      var minPrice = plans.Any() ? plans.Min(p => p.Price) : (decimal?)null;
+      <div class="store-card">
+        <h3>@app.Name</h3>
+        <p class="store-desc">@(string.IsNullOrWhiteSpace(app.Description) ? "暂无说明" : app.Description)</p>
+        <p class="store-meta">@plans.Count 个价格方案 · @(minPrice.HasValue ? $"¥{minPrice.Value:0.00} 起" : "暂无可购买方案")</p>
+        <a class="store-btn" href="/Store/Detail/@app.Id">查看详情 / 购买</a>
+      </div>
+    }
+  </div>
+}

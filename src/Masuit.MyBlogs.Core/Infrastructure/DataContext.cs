@@ -35,6 +35,13 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<AppLicense>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
+        modelBuilder.Entity<AppOrder>().HasIndex(e => e.OrderNo).IsUnique();
+        modelBuilder.Entity<AppOrder>().HasIndex(e => e.UserInfoId);
+        modelBuilder.Entity<AppOrder>().HasIndex(e => e.CreatedAt).IsDescending();
+        modelBuilder.Entity<AppOrder>().HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserInfoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppOrder>().HasOne(e => e.Application).WithMany().HasForeignKey(e => e.ApplicationInfoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AppOrder>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<AppOrder>().HasOne(e => e.IssuedLicense).WithMany().HasForeignKey(e => e.IssuedLicenseId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.ListenPort).IsUnique();
         modelBuilder.Entity<BrakeLeaderboardEntry>().HasIndex(e => e.Ip).IsUnique();
 
@@ -169,6 +176,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<AppPricePlan> AppPricePlan { get; set; }
 
     public virtual DbSet<AppVersion> AppVersion { get; set; }
+
+    public virtual DbSet<AppOrder> AppOrder { get; set; }
 
     public virtual DbSet<PortForwardRule> PortForwardRule { get; set; }
 

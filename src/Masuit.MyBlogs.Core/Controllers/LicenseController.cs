@@ -40,6 +40,11 @@ public IAppPricePlanService AppPricePlanService { get; set;}
 public IAppVersionService AppVersionService { get; set;}
 
 /// <summary>
+/// 购买订单服务（删价格方案时需校验订单引用，订单外键为 Restrict）
+/// </summary>
+public IAppOrderService AppOrderService { get; set;}
+
+/// <summary>
 /// 授权管理首页：全部授权按到期时间排序
 /// </summary>
 /// <returns></returns>
@@ -287,6 +292,11 @@ public IActionResult DeletePricePlan([FromBodyOrDefault] LicenseIdCommand cmd)
 if (AppLicenseService.Any(l => l.PricePlanId == cmd.Id))
 {
 return ResultData(null, false, "该方案已有授权在用，请先删除或改绑相关授权！");
+}
+
+if (AppOrderService.Any(o => o.PricePlanId == cmd.Id))
+{
+return ResultData(null, false, "该方案已有购买订单记录，不能删除（订单需保留方案引用备查）！");
 }
 
 var b = AppPricePlanService.DeleteById(cmd.Id);

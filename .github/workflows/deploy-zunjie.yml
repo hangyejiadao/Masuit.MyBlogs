@@ -80,7 +80,7 @@ jobs:
             esac
             ARCHIVE="/tmp/$ARCHIVE_NAME"
             STAGING=$(mktemp -d "/tmp/myblogs-zunjie-$RELEASE_ID.XXXXXX")
-            DESTINATION="$DEPLOY_PATH/appwwwroot/zunjie"
+            DESTINATION="$DEPLOY_PATH/appwwwroot/shache"
             trap 'rm -rf "$STAGING" "$ARCHIVE"' EXIT
 
             test -s "$ARCHIVE"
@@ -95,13 +95,13 @@ jobs:
               "$STAGING/" "$DESTINATION/"
             test -s "$DESTINATION/index.html"
             curl -fsSL --retry 3 --max-time 20 \
-              "https://hangyejiadao.vip/zunjie?release=$RELEASE_ID" | grep -Fq 'REDLINE'
+              "https://hangyejiadao.vip/shache?release=$RELEASE_ID" | grep -Fq 'REDLINE'
             for asset in app.js engine.js scene.js; do
               headers=$(curl -fsSI --retry 3 --max-time 20 \
-                "https://hangyejiadao.vip/zunjie/$asset?v=$RELEASE_ID")
+                "https://hangyejiadao.vip/shache/$asset?v=$RELEASE_ID")
               printf '%s\n' "$headers" | grep -iqE '^content-type: (text|application)/javascript'
             done
             curl -fsS --retry 3 --max-time 20 \
-              "https://hangyejiadao.vip/zunjie/version.json?release=$RELEASE_ID" \
+              "https://hangyejiadao.vip/shache/version.json?release=$RELEASE_ID" \
               | grep -Fq "\"commit\": \"$RELEASE_ID\""
             echo "Redline game published to $DESTINATION"

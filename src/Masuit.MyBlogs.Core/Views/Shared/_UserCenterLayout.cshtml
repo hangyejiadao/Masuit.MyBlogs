@@ -1,0 +1,129 @@
+@using Masuit.MyBlogs.Core.Models.DTO
+@using Masuit.MyBlogs.Core.Models.ViewModel
+@using Masuit.Tools.AspNetCore.Extensions
+@{
+  var ucUser = Context.Session.Get<UserInfoDto>(SessionKey.UserInfo);
+  var ucPath = Context.Request.Path.Value ?? string.Empty;
+  bool ucLoggedIn = ucUser != null && ucUser.Id > 0;
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>@(ViewBag.Title ?? "用户中心")</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      background: #f4f7fb;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .uc-topbar {
+      background: #1566b6;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(21, 102, 182, .25);
+    }
+    .uc-topbar-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+      min-height: 56px;
+    }
+    .uc-brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff !important;
+      text-decoration: none;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    .uc-nav { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: center; }
+    .uc-nav-link {
+      color: #dbeafe !important;
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: .95rem;
+      white-space: nowrap;
+    }
+    .uc-nav-link:hover { background: rgba(255, 255, 255, .15); color: #fff !important; }
+    .uc-nav-link.active { background: rgba(255, 255, 255, .22); color: #fff !important; font-weight: 600; }
+    .uc-topbar-user {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      font-size: .92rem;
+      padding: 6px 0;
+    }
+    .uc-topbar-user a { color: #fff !important; text-decoration: none; white-space: nowrap; }
+    .uc-topbar-user a:hover { text-decoration: underline; }
+    .uc-main {
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 20px 16px 8px;
+      flex: 1;
+    }
+    .uc-footer {
+      text-align: center;
+      color: #8a97a5;
+      font-size: .88rem;
+      padding: 18px 16px 24px;
+    }
+    .uc-footer a { color: #1566b6; text-decoration: none; }
+    .uc-footer a:hover { text-decoration: underline; }
+    @@media (max-width: 768px) {
+      .uc-main table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+    @@media (max-width: 640px) {
+      .uc-topbar-inner { gap: 4px 10px; padding-top: 8px; padding-bottom: 8px; }
+      .uc-topbar-user { margin-left: 0; }
+      .uc-main { padding: 14px 10px 4px; }
+    }
+  </style>
+</head>
+<body>
+<header class="uc-topbar">
+  <div class="uc-topbar-inner">
+    <a class="uc-brand" href="/UserCenter">用户中心</a>
+    <nav class="uc-nav">
+      @if (ucLoggedIn)
+      {
+        <a class="uc-nav-link@(ucPath.Equals("/UserCenter", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter">首页</a>
+        <a class="uc-nav-link@(ucPath.Equals("/UserCenter/Orders", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter/Orders">购买记录</a>
+        <a class="uc-nav-link@(ucPath.Equals("/UserCenter/Licenses", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter/Licenses">已购授权</a>
+      }
+      <a class="uc-nav-link" href="/">返回博客</a>
+    </nav>
+    <div class="uc-topbar-user">
+      @if (ucLoggedIn)
+      {
+        <span>@ucUser.NickName</span>
+        <a href="/Passport/Logout">退出登录</a>
+      }
+      else
+      {
+        <a href="/UserCenter/Login">登录</a>
+      }
+    </div>
+  </div>
+</header>
+<main class="uc-main">
+  @RenderBody()
+</main>
+<footer class="uc-footer">
+  用户中心 · 购买记录与已购授权自助管理 · <a href="/">返回博客首页</a>
+</footer>
+</body>
+</html>

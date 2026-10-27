@@ -1,23 +1,15 @@
 @{
-  Layout = null;
+  ViewBag.Title = "用户中心登录";
   var returnUrl = ViewBag.ReturnUrl as string ?? "/UserCenter";
   var oauthReturnParam = "?returnUrl=" + System.Net.WebUtility.UrlEncode(returnUrl);
 }
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-  <meta charset="UTF-8">
-  <meta content="width=device-width,initial-scale=1.0" name="viewport">
-  <title>用户中心登录</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Roboto', Arial, sans-serif;
-      min-height: 100vh;
-      margin: 0;
+    .uc-login-wrap {
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 36px 12px 44px;
+      border-radius: 12px;
       background: linear-gradient(135deg, #eaf3fb 0%, #d7e8f7 100%);
     }
     .uc-login-card {
@@ -117,8 +109,7 @@
     .uc-login-footer a { color: #1566b6; text-decoration: none; }
     .uc-login-footer a:hover { text-decoration: underline; }
   </style>
-</head>
-<body>
+<div class="uc-login-wrap">
 <div id="app">
   <div class="uc-login-card">
     <div class="uc-login-title">用户中心登录</div>
@@ -235,5 +226,4 @@
         }
       }).mount('#app')
 </script>
-</body>
-</html>
+</div>

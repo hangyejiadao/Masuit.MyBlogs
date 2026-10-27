@@ -1,0 +1,105 @@
+@using Masuit.MyBlogs.Core.Models.Entity
+@model List<AppLicense>
+@{
+  ViewBag.Title = "已购 License 管理";
+  bool IsPermanent(AppLicense l) => l.ExpireDate >= l.StartDate.AddYears(99);
+  bool IsExpired(AppLicense l) => !IsPermanent(l) && l.ExpireDate.Date < DateTime.Today;
+  string ExpireText(AppLicense l) => IsPermanent(l) ? "永久" : l.ExpireDate.ToString("yyyy-MM-dd");
+}
+<style>
+  .store-head { margin: 16px 0 6px; }
+  .uc-nav { margin-bottom: 14px; font-size: .95rem; }
+  .license-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
+  .license-table th, .license-table td { border-bottom: 1px solid #e3eaf2; padding: 9px 8px; text-align: left; font-size: .95rem; vertical-align: top; }
+  .license-table th { color: #555; }
+  .license-key { font-family: monospace; word-break: break-all; font-size: .85rem; }
+  .copy-btn {
+    margin-left: 8px;
+    padding: 2px 10px;
+    border: 1px solid #c9d8e6;
+    border-radius: 5px;
+    background: #f2f7fc;
+    color: #1566b6;
+    font-size: .82rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .copy-btn:hover { background: #e3eef8; }
+  .lic-valid { color: #27632a; font-weight: 600; }
+  .lic-expired { color: #c0392b; font-weight: 600; }
+  .store-empty { color: #888; padding: 30px 0; }
+</style>
+<h2 class="store-head">已购 License 管理</h2>
+<p class="uc-nav"><a href="/UserCenter">← 返回用户中心</a></p>
+@if (!Model.Any())
+{
+  <p class="store-empty">暂无已购授权，<a href="/Store">去商店看看</a>，支付成功后授权会自动出现在这里。</p>
+}
+else
+{
+  <table class="license-table">
+    <thead>
+      <tr>
+        <th>应用</th>
+        <th>授权码</th>
+        <th>方案</th>
+        <th>实付价</th>
+        <th>生效时间</th>
+        <th>到期时间</th>
+        <th>状态</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var license in Model)
+      {
+        <tr>
+          <td>@(license.Application?.Name ?? "-")</td>
+          <td>
+            <span class="license-key">@license.LicenseKey</span>
+            <button class="copy-btn" data-key="@license.LicenseKey" onclick="copyLicenseKey(this)" type="button">复制</button>
+          </td>
+          <td>@(license.PricePlan?.Name ?? "-")</td>
+          <td>@(license.PaidPrice.HasValue ? "¥" + license.PaidPrice.Value.ToString("0.00") : "-")</td>
+          <td>@license.StartDate.ToString("yyyy-MM-dd")</td>
+          <td>@ExpireText(license)</td>
+          <td>
+            @if (IsExpired(license))
+            {
+              <span class="lic-expired">已过期</span>
+            }
+            else
+            {
+              <span class="lic-valid">有效</span>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}
+<script>
+  function copyLicenseKey(btn) {
+    var key = btn.getAttribute('data-key');
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(key).then(done).catch(function () { fallbackCopy(key); done(); });
+    } else {
+      fallbackCopy(key);
+      done();
+    }
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { }
+    document.body.removeChild(ta);
+  }
+</script>

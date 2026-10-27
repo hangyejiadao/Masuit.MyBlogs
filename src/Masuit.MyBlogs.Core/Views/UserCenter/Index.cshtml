@@ -1,0 +1,46 @@
+@using Masuit.MyBlogs.Core.Models.DTO
+@model UserInfoDto
+@{
+  ViewBag.Title = "用户中心";
+}
+<style>
+  .store-head { margin: 16px 0 6px; }
+  .uc-user { color: #555; margin-bottom: 18px; }
+  .uc-grid { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 28px; }
+  .uc-card {
+    width: 250px;
+    border: 1px solid #e3eaf2;
+    border-radius: 10px;
+    padding: 18px;
+    background: #fff;
+  }
+  .uc-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+  .uc-card p { color: #777; margin: 0 0 14px; font-size: .92rem; line-height: 1.5; }
+  .uc-btn { display: inline-block; text-align: center; padding: 8px 18px; border-radius: 6px; background: #1566b6; color: #fff !important; text-decoration: none; }
+  .uc-btn:hover { background: #0f5294; }
+</style>
+<h2 class="store-head">用户中心</h2>
+<p class="uc-user">
+  你好，<strong>@Model.NickName</strong>（账号：@Model.Username）
+  @if (!string.IsNullOrWhiteSpace(Model.Email))
+  {
+    <span> · 邮箱：@Model.Email</span>
+  }
+</p>
+<div class="uc-grid">
+  <div class="uc-card">
+    <h3>购买记录</h3>
+    <p>共 @(ViewBag.OrderCount ?? 0) 笔订单，查看下单、支付状态与每笔订单的详情。</p>
+    <a class="uc-btn" href="/UserCenter/Orders">查看购买记录</a>
+  </div>
+  <div class="uc-card">
+    <h3>已购 License 管理</h3>
+    <p>共 @(ViewBag.LicenseCount ?? 0) 条授权，查看授权码全文、生效与到期时间，并可一键复制。</p>
+    <a class="uc-btn" href="/UserCenter/Licenses">管理我的授权</a>
+  </div>
+  <div class="uc-card">
+    <h3>软件购买</h3>
+    <p>去商店选购应用与价格方案，支付成功后授权会自动发放到本账号。</p>
+    <a class="uc-btn" href="/Store">去商店看看</a>
+  </div>
+</div>

@@ -4,7 +4,9 @@ using Hangfire;
 using Masuit.MyBlogs.Core.Common;
 using Masuit.MyBlogs.Core.Common.Mails;
 using Masuit.MyBlogs.Core.Extensions;
+using Masuit.MyBlogs.Core.Extensions.Firewall;
 using Masuit.Tools.AspNetCore.ModelBinder;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Masuit.MyBlogs.Core.Controllers;
 
@@ -524,7 +526,7 @@ return ResultData(null, true, $"提醒邮件已发送到 {email}");
 /// </summary>
 /// <param name="cmd"></param>
 /// <returns></returns>
-[HttpPost]
+[HttpPost, AllowAnonymous, AllowAccessFirewall]
 public IActionResult Verify([FromBodyOrDefault] LicenseVerifyCommand cmd)
 {
 if (cmd == null || string.IsNullOrWhiteSpace(cmd.LicenseKey))

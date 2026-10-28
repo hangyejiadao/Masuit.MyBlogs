@@ -4,7 +4,7 @@ namespace Masuit.MyBlogs.Core.Controllers;
 
 /// <summary>
 /// 普通用户中心（前台）：与管理员后台（Vue 控制面板）彻底分开的普通用户自助区域，
-/// 含独立登录页、购买记录与已购 License 管理；所有数据严格按当前登录用户隔离查询，绝不跨用户。
+/// 含独立登录页、我的订单与已购 License 管理；所有数据严格按当前登录用户隔离查询，绝不跨用户。
 /// </summary>
 public sealed class UserCenterController : BaseController
 {
@@ -61,7 +61,7 @@ public sealed class UserCenterController : BaseController
 	}
 
 	/// <summary>
-	/// 用户中心首页：当前用户昵称/邮箱概览与子页入口（购买记录、已购 License），未登录跳独立登录页
+	/// 用户中心首页：当前用户昵称/邮箱概览与子页入口（我的订单、已购 License），未登录跳独立登录页
 	/// </summary>
 	/// <returns></returns>
 	[HttpGet]
@@ -87,7 +87,7 @@ public sealed class UserCenterController : BaseController
 	}
 
 	/// <summary>
-	/// 购买记录：当前用户自己的全部订单（按下单时间倒序），已支付且已发放授权的订单给出查看授权入口
+	/// 我的订单：当前用户自己的全部订单（按下单时间倒序），已支付订单带出已发放的授权码与到期时间
 	/// </summary>
 	/// <returns></returns>
 	[HttpGet]
@@ -100,12 +100,12 @@ public sealed class UserCenterController : BaseController
 
 		try
 		{
-			var orders = AppOrderService.GetQuery(o => o.UserInfoId == CurrentUser.Id).Include(o => o.Application).OrderByDescending(o => o.CreatedAt).ToList();
+			var orders = AppOrderService.GetQuery(o => o.UserInfoId == CurrentUser.Id).Include(o => o.Application).Include(o => o.IssuedLicense).OrderByDescending(o => o.CreatedAt).ToList();
 			return View(orders);
 		}
 		catch (Exception ex)
 		{
-			LogManager.Error($"用户中心购买记录加载失败，用户id：{CurrentUser.Id}", ex);
+			LogManager.Error($"用户中心我的订单加载失败，用户id：{CurrentUser.Id}", ex);
 			throw;
 		}
 	}

@@ -54,7 +54,7 @@
       <div>生效日期：@license.StartDate.ToString("yyyy-MM-dd") · 到期：@ExpireText(license)</div>
       <div class="pay-key">授权码：@license.LicenseKey</div>
     }
-    <div style="margin-top:10px"><a href="/Store/MyOrders">去「我的订单」查看</a></div>
+    <div style="margin-top:10px"><a href="/UserCenter/Orders">去「我的订单」查看</a></div>
   </div>
 }
 else if (Model.OrderStatus == AppOrderStatus.Closed)
@@ -76,5 +76,5 @@ else
     <strong>支付通道尚未配置，请联系管理员。</strong><br />
     您的订单已保留为「待支付」，管理员完成支付宝配置后，您可以在「我的订单」中找到这笔订单继续支付，无需重新下单。
   </div>
-  <p><a href="/Store/MyOrders">去「我的订单」查看这笔订单</a></p>
+  <p><a href="/UserCenter/Orders">去「我的订单」查看这笔订单</a></p>
 }

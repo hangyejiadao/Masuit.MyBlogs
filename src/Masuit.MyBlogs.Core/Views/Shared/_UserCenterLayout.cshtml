@@ -101,7 +101,7 @@
       @if (ucLoggedIn)
       {
         <a class="uc-nav-link@(ucPath.Equals("/UserCenter", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter">首页</a>
-        <a class="uc-nav-link@(ucPath.Equals("/UserCenter/Orders", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter/Orders">购买记录</a>
+        <a class="uc-nav-link@(ucPath.Equals("/UserCenter/Orders", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter/Orders">我的订单</a>
         <a class="uc-nav-link@(ucPath.Equals("/UserCenter/Licenses", StringComparison.OrdinalIgnoreCase) ? " active" : "")" href="/UserCenter/Licenses">已购授权</a>
       }
       <a class="uc-nav-link" href="/">返回博客</a>
@@ -123,7 +123,7 @@
   @RenderBody()
 </main>
 <footer class="uc-footer">
-  用户中心 · 购买记录与已购授权自助管理 · <a href="/">返回博客首页</a>
+  用户中心 · 我的订单与已购授权自助管理 · <a href="/">返回博客首页</a>
 </footer>
 </body>
 </html>

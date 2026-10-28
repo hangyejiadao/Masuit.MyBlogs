@@ -2,9 +2,10 @@
 @using Masuit.MyBlogs.Core.Models.Enum
 @model List<AppOrder>
 @{
-  ViewBag.Title = "购买记录";
+  ViewBag.Title = "我的订单";
   string StatusText(AppOrderStatus s) => s switch { AppOrderStatus.Paid => "已支付", AppOrderStatus.Closed => "已关闭", _ => "待支付" };
   string ValidityText(int days) => days > 0 ? days + " 天" : "永久";
+  string ExpireText(AppLicense l) => l.ExpireDate >= l.StartDate.AddYears(99) ? "永久" : l.ExpireDate.ToString("yyyy-MM-dd");
 }
 <style>
   .store-head { margin: 16px 0 6px; }
@@ -12,16 +13,17 @@
   .orders-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
   .orders-table th, .orders-table td { border-bottom: 1px solid #e3eaf2; padding: 9px 8px; text-align: left; font-size: .95rem; vertical-align: top; }
   .orders-table th { color: #555; }
+  .order-key { font-family: monospace; word-break: break-all; font-size: .85rem; }
   .status-paid { color: #27632a; font-weight: 600; }
   .status-pending { color: #b26a00; font-weight: 600; }
   .status-closed { color: #888; font-weight: 600; }
   .store-empty { color: #888; padding: 30px 0; }
 </style>
-<h2 class="store-head">购买记录</h2>
+<h2 class="store-head">我的订单</h2>
 <p class="uc-nav"><a href="/UserCenter">← 返回用户中心</a></p>
 @if (!Model.Any())
 {
-  <p class="store-empty">暂无购买记录，<a href="/Store">去商店看看</a>。</p>
+  <p class="store-empty">暂无订单，<a href="/Store">去商店看看</a>。</p>
 }
 else
 {
@@ -35,6 +37,7 @@ else
         <th>状态</th>
         <th>下单时间</th>
         <th>支付时间</th>
+        <th>授权码 / 到期</th>
         <th>操作</th>
       </tr>
     </thead>
@@ -62,6 +65,18 @@ else
           </td>
           <td>@order.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
           <td>@(order.PaidAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+          <td>
+            @if (order.OrderStatus == AppOrderStatus.Paid && order.IssuedLicense != null)
+            {
+              <span class="order-key">@order.IssuedLicense.LicenseKey</span>
+              <br />
+              <span style="color:#777">到期：@ExpireText(order.IssuedLicense)</span>
+            }
+            else
+            {
+              <span style="color:#aaa">-</span>
+            }
+          </td>
           <td>
             @if (order.OrderStatus == AppOrderStatus.Pending)
             {

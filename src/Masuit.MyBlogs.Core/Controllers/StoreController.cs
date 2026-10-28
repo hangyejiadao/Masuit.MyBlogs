@@ -247,7 +247,7 @@ public sealed class StoreController : BaseController
 	{
 		if (CurrentUser.Id <= 0)
 		{
-			return RedirectToLogin("/Store/MyOrders");
+			return RedirectToLogin("/UserCenter/Orders");
 		}
 
 		var order = AppOrderService.GetQuery(o => o.OrderNo == outTradeNo).Include(o => o.Application).FirstOrDefault();
@@ -261,19 +261,13 @@ public sealed class StoreController : BaseController
 	}
 
 	/// <summary>
-	/// 我的订单：当前用户的全部订单（按下单时间倒序），已支付订单带出已发放的授权码与到期时间
+	/// 我的订单（旧地址）：订单页已并入用户中心，本动作只做重定向，保留旧链接可用
 	/// </summary>
 	/// <returns></returns>
 	[HttpGet]
 	public IActionResult MyOrders()
 	{
-		if (CurrentUser.Id <= 0)
-		{
-			return RedirectToLogin("/Store/MyOrders");
-		}
-
-		var orders = AppOrderService.GetQuery(o => o.UserInfoId == CurrentUser.Id).Include(o => o.Application).Include(o => o.IssuedLicense).OrderByDescending(o => o.CreatedAt).ToList();
-		return View(orders);
+		return Redirect("/UserCenter/Orders");
 	}
 
 	/// <summary>

@@ -130,3 +130,41 @@ jQuery(document).ready(function($){
 		}
 	}
 });
+//顶栏右上角用户下拉菜单：点击触发开/关，点击外部或按Esc关闭（独立逻辑，不与cd-nav的既有处理冲突）
+jQuery(document).ready(function ($) {
+    var $userMenu = $('.cd-user-menu');
+    if (!$userMenu.length) return;
+    var $userTrigger = $userMenu.find('.cd-user-trigger');
+    var $userDropdown = $userMenu.find('.cd-user-dropdown');
+    if (!$userTrigger.length || !$userDropdown.length) return;
+
+    function closeUserMenu() {
+        $userDropdown.removeClass('is-visible');
+        $userTrigger.attr('aria-expanded', 'false');
+    }
+
+    $userTrigger.on('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var isOpen = $userDropdown.hasClass('is-visible');
+        closeUserMenu();
+        if (!isOpen) {
+            $userDropdown.addClass('is-visible');
+            $userTrigger.attr('aria-expanded', 'true');
+        }
+    });
+
+    $userDropdown.on('click', function (event) {
+        event.stopPropagation();
+    });
+
+    $(document).on('click', function () {
+        closeUserMenu();
+    });
+
+    $(document).on('keydown', function (event) {
+        if (event.key === 'Escape' || event.keyCode === 27) {
+            closeUserMenu();
+        }
+    });
+});

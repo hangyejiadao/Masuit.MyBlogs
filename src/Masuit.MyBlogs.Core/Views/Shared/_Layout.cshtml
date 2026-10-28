@@ -21,6 +21,7 @@
     e.Url,
     e.Name
   }).Cacheable().ToPooledListScope();
+  var userInitial = !string.IsNullOrEmpty(currentUser?.NickName) ? currentUser.NickName.Substring(0, 1) : "用";
 }
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -108,12 +109,36 @@
   </noscript>
 }
 <div id="toc"></div>
-<div class="header">
+<div class="header @(currentUser != null ? "has-user-menu" : "has-login-link")">
   <header class="cd-main-header">
     <a class="cd-logo" href="/">
       <img alt="@CommonHelper.SystemSettings["Title"]" decoding="async" src="@CommonHelper.SystemSettings["logo"]">
       <h1 class="slogan">@CommonHelper.SystemSettings["Slogan"]</h1>
     </a>
+    <div class="cd-user-menu">
+      @if (currentUser == null) {
+        <a class="cd-user-login" href="/Passport/Login">登录</a>
+      } else {
+        <button class="cd-user-trigger" id="cdUserTrigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="cd-user-avatar" aria-hidden="true">@userInitial</span>
+          <span class="cd-user-name">@currentUser.NickName</span>
+          <span class="cd-user-caret" aria-hidden="true"></span>
+        </button>
+        <div class="cd-user-dropdown" id="cdUserDropdown">
+          <a href="/UserCenter">用户中心</a>
+          <a href="/Store/MyOrders">我的订单</a>
+          @if (user.IsAdmin) {
+            <a href="/dashboard/posts/write" target="_blank">
+              <i class="icon icon-pencil"></i>
+              写文章
+            </a>
+            <a asp-action="Index" asp-controller="Dashboard" target="_blank">控制面板</a>
+          }
+          <div class="cd-user-divider"></div>
+          <a href="/Passport/Logout">退出登录</a>
+        </div>
+      }
+    </div>
     <ul class="cd-header-buttons">
       <li>
         <a class="cd-search-trigger" href="#cd-search">
@@ -132,51 +157,9 @@
   <nav class="cd-nav">
     <ul class="cd-primary-nav is-fixed" id="cd-primary-nav">
       @{
-        if (user.IsAdmin) {
-          <li>
-            <a href="/dashboard/posts/write" target="_blank">
-              <i class="icon icon-pencil"></i>
-              写文章
-            </a>
-          </li>
-          <li>
-            <a asp-action="Index" asp-controller="Dashboard" target="_blank">控制面板</a>
-          </li>
-          <li>
-            <a> | </a>
-          </li>
-        }
-
-        if (currentUser != null) {
-          <li>
-            <a>@currentUser.NickName</a>
-          </li>
-          <li>
-            <a href="/Passport/Logout">退出登录</a>
-          </li>
-          <li>
-            <a> | </a>
-          </li>
-        } else {
-          <li>
-            <a href="/Passport/Login">登录</a>
-          </li>
-          <li>
-            <a> | </a>
-          </li>
-        }
-
         <li>
           <a href="/Store">软件购买</a>
         </li>
-        if (currentUser != null) {
-          <li>
-            <a href="/Store/MyOrders">我的订单</a>
-          </li>
-          <li>
-            <a href="/UserCenter">用户中心</a>
-          </li>
-        }
         <li>
           <a> | </a>
         </li>

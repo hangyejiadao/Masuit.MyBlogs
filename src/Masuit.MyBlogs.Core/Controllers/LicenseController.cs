@@ -518,6 +518,42 @@ return ResultData(null, true, $"提醒邮件已发送到 {email}");
 }
 
 /// <summary>
+/// 授权在线校验（供被授权的软件客户端调用，无需登录，授权码本身即凭证）：
+/// 凭授权码返回所属应用名称、应用标识与授权起止日期；授权码不存在或已停用时返回失败，
+/// 已过期的授权仍返回成功并带数据，由调用方按到期日自行判断
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost]
+public IActionResult Verify([FromBodyOrDefault] LicenseVerifyCommand cmd)
+{
+if (cmd == null || string.IsNullOrWhiteSpace(cmd.LicenseKey))
+{
+return ResultData(null, false, "授权码不能为空");
+}
+
+var license = AppLicenseService.GetQuery(l => l.LicenseKey == cmd.LicenseKey.Trim()).Include(l => l.Application).FirstOrDefault();
+if (license == null)
+{
+return ResultData(null, false, "授权码无效");
+}
+
+if (license.Status != Status.Available)
+{
+return ResultData(null, false, "授权已停用");
+}
+
+var expired = license.ExpireDate.Date < DateTime.Today;
+return ResultData(new
+{
+ApplicationName = license.Application == null? null: license.Application.Name,
+AppKey = license.Application == null? null: license.Application.AppKey,
+license.StartDate,
+license.ExpireDate
+}, true, expired? "授权已过期": "授权有效");
+}
+
+/// <summary>
 /// 为被授权用户生成授权码：以「用户邮箱（无邮箱时用用户名）+ 当前毫秒时间戳 + 随机数」为原文做 SHA256，
 /// 得到 64 位十六进制串；毫秒时间戳与随机数保证并发下每次生成的原文都不同，
 /// 生成后再查库确认未被占用，配合数据库 LicenseKey 唯一索引兜底，并发签发也不会重复

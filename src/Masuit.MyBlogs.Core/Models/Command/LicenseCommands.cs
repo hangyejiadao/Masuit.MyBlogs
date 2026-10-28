@@ -159,3 +159,14 @@ public class LicenseIdCommand
 	/// </summary>
 	public int Months { get; set; }
 }
+
+/// <summary>
+/// 授权在线校验参数（供被授权的软件客户端调用）
+/// </summary>
+public class LicenseVerifyCommand
+{
+	/// <summary>
+	/// 待校验的授权码
+	/// </summary>
+	public string LicenseKey { get; set; }
+}

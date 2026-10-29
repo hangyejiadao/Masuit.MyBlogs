@@ -1312,7 +1312,7 @@ support for no js
     /* 给用户菜单在主导航右侧预留位置，避免导航项与用户菜单重叠 */
     .header.has-user-menu .cd-primary-nav { padding-right: 240px; }
 
-    .header.has-login-link .cd-primary-nav { padding-right: 140px; }
+    .header.has-login-link .cd-primary-nav { padding-right: 250px; }
 }
 
 @media only screen and (max-width: 1169px) {

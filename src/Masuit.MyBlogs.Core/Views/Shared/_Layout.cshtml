@@ -118,6 +118,7 @@
     <div class="cd-user-menu">
       @if (currentUser == null) {
         <a class="cd-user-login" href="/Passport/Login">登录</a>
+        <a class="cd-user-login" style="margin-left: 10px;" href="/UserCenter/Register">注册</a>
       } else {
         <button class="cd-user-trigger" id="cdUserTrigger" type="button" aria-haspopup="true" aria-expanded="false">
           <span class="cd-user-avatar" aria-hidden="true">@userInitial</span>

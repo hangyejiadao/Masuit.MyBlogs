@@ -19,6 +19,8 @@ namespace Masuit.MyBlogs.Core.Controllers;
 /// 代理到 MT5 的 MCP 服务并短路博客管道，挂在 /mcp 下会被转发走；/api/mcp 不命中该规则（需精确相等或以「/mcp/」开头）。
 /// 鉴权：Authorization: Bearer 令牌，令牌值存系统设置 McpPublishToken（后台「系统设置」页可自助修改）；
 /// 未配置令牌时接口一律拒绝，令牌比较使用恒定时间比较。
+/// 开关：系统设置 McpPublishEnabled（后台「系统设置」页的 MCP 配置卡片维护）；该键缺失时沿用旧行为（配了令牌即启用），
+/// 键存在且值不为 true 时接口一律返回 503 关闭提示，与令牌是否配置无关。
 /// </summary>
 [Route("api/mcp")]
 public sealed class McpController : BaseController
@@ -27,6 +29,11 @@ public sealed class McpController : BaseController
 	/// MCP 发布令牌在系统设置中的键名
 	/// </summary>
 	private const string TokenSettingKey = "McpPublishToken";
+
+	/// <summary>
+	/// MCP 启用开关在系统设置中的键名（值为 true/false；键缺失表示未在后台保存过开关，沿用「配了令牌即启用」的旧行为）
+	/// </summary>
+	private const string EnabledSettingKey = "McpPublishEnabled";
 
 	/// <summary>
 	/// 单次请求体上限（字节）：需容纳 upload_image 的 base64 图片（图片上限 20MB，base64 约 27MB），留足余量
@@ -92,6 +99,12 @@ public sealed class McpController : BaseController
 	[HttpPost, AllowAnonymous, AllowAccessFirewall]
 	public async Task<ActionResult> Handle(CancellationToken cancellationToken)
 	{
+		var enabledSetting = CommonHelper.SystemSettings.GetOrAdd(EnabledSettingKey, "");
+		if (!string.IsNullOrEmpty(enabledSetting) && !string.Equals(enabledSetting.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+		{
+			return new JsonResult(new { error = "MCP 接口未启用：管理员已在后台「系统设置」中关闭 MCP 智能体发布" }) { StatusCode = StatusCodes.Status503ServiceUnavailable };
+		}
+
 		var configuredToken = CommonHelper.SystemSettings.GetOrAdd(TokenSettingKey, "");
 		if (string.IsNullOrWhiteSpace(configuredToken))
 		{

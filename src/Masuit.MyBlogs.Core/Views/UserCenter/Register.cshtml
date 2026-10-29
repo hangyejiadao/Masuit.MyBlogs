@@ -79,6 +79,29 @@
       display: none;
     }
     .error-message.show { display: block; }
+    .info-message {
+      color: #1e7e34;
+      background: #e6f4ea;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: .95rem;
+      display: none;
+    }
+    .info-message.show { display: block; }
+    .send-code-btn {
+      flex: none;
+      width: 118px;
+      height: 42px;
+      background: #1566b6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .92rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .send-code-btn:hover:not(:disabled) { background: #0f5294; }
+    .send-code-btn:disabled { background: #b9c9d8; cursor: not-allowed; }
     .uc-login-footer { text-align: center; margin-top: 20px; font-size: .92rem; }
     .uc-login-footer a { color: #1566b6; text-decoration: none; }
     .uc-login-footer a:hover { text-decoration: underline; }
@@ -91,6 +114,7 @@
     @Html.AntiForgeryToken()
     <div class="uc-form">
       <div :class="{show:errorMessage}" class="error-message">{{ errorMessage }}</div>
+      <div :class="{show:infoMessage}" class="info-message">{{ infoMessage }}</div>
       <div class="input-group">
         <label for="username">用户名</label>
         <input id="username" maxlength="20" placeholder="3-20 位，注册后用于登录" required type="text" v-model="username">
@@ -102,6 +126,13 @@
       <div class="input-group">
         <label for="email">邮箱</label>
         <input id="email" maxlength="100" placeholder="请输入常用邮箱" required type="email" v-model="email">
+      </div>
+      <div class="input-group">
+        <label for="emailCode">邮箱验证码</label>
+        <div class="captcha-group">
+          <input autocomplete="off" id="emailCode" maxlength="6" placeholder="请输入邮箱收到的验证码" required type="text" v-model="emailCode" @@keyup.enter="handleRegister">
+          <button :disabled="countdown > 0 || sendingCode" @@click="sendEmailCode" class="send-code-btn" type="button">{{ countdown > 0 ? countdown + ' 秒后重发' : '发送验证码' }}</button>
+        </div>
       </div>
       <div class="input-group">
         <label for="password">密码</label>
@@ -139,6 +170,11 @@
             username: '',
             nickname: '',
             email: '',
+            emailCode: '',
+            infoMessage: '',
+            sendingCode: false,
+            countdown: 0,
+            countdownTimer: null,
             password: '',
             passwordConfirm: '',
             captchaInput: '',
@@ -155,6 +191,42 @@
           refreshCaptcha() {
             this.ramdom = Date.now();
           },
+          async sendEmailCode() {
+            this.errorMessage = '';
+            this.infoMessage = '';
+            const email = this.email.trim();
+            if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
+              this.errorMessage = "请先填写正确的邮箱地址";
+              return;
+            }
+            this.sendingCode = true;
+            try {
+              const res = await axios.create({
+                headers: {
+                  'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                }
+              }).post('/Validate/SendCode', {
+                email: email
+              });
+              if (res.data.Success) {
+                this.infoMessage = res.data.Message || '验证码已发送，请查收邮箱';
+                this.countdown = 120;
+                clearInterval(this.countdownTimer);
+                this.countdownTimer = setInterval(() => {
+                  this.countdown--;
+                  if (this.countdown <= 0) {
+                    clearInterval(this.countdownTimer);
+                  }
+                }, 1000);
+              } else {
+                this.errorMessage = res.data.Message || '验证码发送失败，请稍后重试';
+              }
+            } catch (e) {
+              this.errorMessage = '网络异常，验证码发送失败';
+            } finally {
+              this.sendingCode = false;
+            }
+          },
           async handleRegister() {
             this.errorMessage = '';
             const username = this.username.trim();
@@ -169,6 +241,10 @@
             const email = this.email.trim();
             if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
               this.errorMessage = "邮箱格式不正确";
+              return;
+            }
+            if (this.emailCode.trim().length < 6) {
+              this.errorMessage = "请输入邮箱收到的6位验证码";
               return;
             }
             if (this.password.length < 6 || this.password.length > 20) {
@@ -194,6 +270,7 @@
               username: username,
               nickname: this.nickname.trim(),
               email: email,
+              emailCode: this.emailCode.trim(),
               password: encrypt.encrypt(this.password),
               passwordConfirm: encrypt.encrypt(this.passwordConfirm),
               valid: this.captchaInput.trim(),

@@ -100,19 +100,20 @@ public sealed class UserCenterController : BaseController
 	}
 
 	/// <summary>
-	/// 普通用户注册提交：图形验证码校验 → RSA 解密密码 → 服务端校验（用户名/昵称/邮箱格式与唯一性、密码长度与两次一致）→
+	/// 普通用户注册提交：图形验证码校验 → 邮箱格式与邮箱验证码校验（验证码须先经 /Validate/SendCode 发送到注册邮箱，与评论流程共用同一份 Redis 验证码）→ RSA 解密密码 → 服务端校验（用户名/昵称唯一性、密码长度与两次一致）→
 	/// 复用 UserInfoService.Register 落库（内部加盐哈希，固定为普通用户）→ 自动登录（写 Session 并记登录记录）→ 返回回跳地址。
 	/// </summary>
 	/// <param name="username">用户名，3-20 位且不能包含空白字符，注册后用于登录</param>
 	/// <param name="nickname">昵称，可空，空时取用户名，最长 30 位</param>
 	/// <param name="email">邮箱，须格式正确且不与现有邮箱重复</param>
+	/// <param name="emailCode">邮箱验证码，注册前发送到注册邮箱的验证码，校验通过后即失效</param>
 	/// <param name="password">RSA 加密后的密码，明文 6-20 位</param>
 	/// <param name="passwordConfirm">RSA 加密后的确认密码，须与密码一致</param>
 	/// <param name="valid">图形验证码</param>
 	/// <param name="returnUrl">注册成功后回到的站内地址，仅接受站内相对路径</param>
 	/// <returns>统一信封结果，成功时 Data 为回跳地址</returns>
 	[HttpPost, ValidateAntiForgeryToken, DistributedLockFilter]
-	public IActionResult Register([FromBodyOrDefault, Required] string username, [FromBodyOrDefault] string nickname, [FromBodyOrDefault, Required] string email, [FromBodyOrDefault, Required] string password, [FromBodyOrDefault, Required] string passwordConfirm, [FromBodyOrDefault, Required] string valid, [FromBodyOrDefault] string returnUrl)
+	public async Task<IActionResult> Register([FromBodyOrDefault, Required] string username, [FromBodyOrDefault] string nickname, [FromBodyOrDefault, Required] string email, [FromBodyOrDefault, Required] string emailCode, [FromBodyOrDefault, Required] string password, [FromBodyOrDefault, Required] string passwordConfirm, [FromBodyOrDefault, Required] string valid, [FromBodyOrDefault] string returnUrl)
 	{
 		string validSession = HttpContext.GetRedisSession<string>("valid") ?? string.Empty;
 		if (string.IsNullOrEmpty(validSession) || string.IsNullOrEmpty(valid) || !valid.Trim().Equals(validSession, StringComparison.InvariantCultureIgnoreCase))
@@ -137,6 +138,12 @@ public sealed class UserCenterController : BaseController
 		if (email.Length is < 5 or > 100 || !IsValidEmail(email))
 		{
 			return ResultData(null, false, "邮箱格式不正确");
+		}
+
+		var savedEmailCode = await RedisHelper.GetAsync("code:" + email);
+		if (string.IsNullOrEmpty(savedEmailCode) || string.IsNullOrEmpty(emailCode) || !savedEmailCode.Equals(emailCode.Trim(), StringComparison.InvariantCultureIgnoreCase))
+		{
+			return ResultData(null, false, "邮箱验证码不正确或已过期，请重新获取");
 		}
 
 		string plainPassword;
@@ -188,6 +195,7 @@ public sealed class UserCenterController : BaseController
 			return ResultData(null, false, "注册失败，用户名或邮箱已被注册");
 		}
 
+		await RedisHelper.DelAsync("code:" + email);
 		var userDto = UserInfoService.Login(username, plainPassword);
 		if (userDto != null)
 		{

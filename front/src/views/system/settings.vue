@@ -422,7 +422,7 @@ const testMcpConnection = async () => {
   try {
     const resp = await fetch(mcpEndpoint.value, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
     })
     if (resp.status === 401) {

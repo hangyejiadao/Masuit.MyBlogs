@@ -1,0 +1,221 @@
+@{
+  ViewBag.Title = "用户注册";
+  var returnUrl = ViewBag.ReturnUrl as string ?? "/UserCenter";
+  var loginUrl = "/UserCenter/Login?returnUrl=" + System.Net.WebUtility.UrlEncode(returnUrl);
+}
+  <style>
+    .uc-login-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 12px 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #eaf3fb 0%, #d7e8f7 100%);
+    }
+    .uc-login-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(21,102,182,.14);
+      padding: 40px 36px;
+      width: 380px;
+      max-width: calc(100vw - 32px);
+    }
+    .uc-login-title {
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.7rem;
+      color: #1566b6;
+      letter-spacing: 1px;
+    }
+    .uc-login-sub {
+      text-align: center;
+      color: #888;
+      font-size: .92rem;
+      margin: 8px 0 26px;
+    }
+    .uc-form { display: flex; flex-direction: column; gap: 15px; }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: .98rem; color: #444; font-weight: 500; }
+    .input-group input[type="text"], .input-group input[type="password"], .input-group input[type="email"] {
+      padding: 11px 12px;
+      border-radius: 8px;
+      border: 1px solid #d8e2ec;
+      font-size: 1rem;
+      outline: none;
+      transition: border .2s;
+    }
+    .input-group input:focus { border-color: #1566b6; background: #f5f9ff; }
+    .captcha-group { display: flex; gap: 8px; align-items: center; }
+    .captcha-group input { flex: 1; min-width: 0; }
+    .captcha-img {
+      width: 100px;
+      height: 40px;
+      background: #eee;
+      border-radius: 6px;
+      cursor: pointer;
+      object-fit: cover;
+      border: 1px solid #d8e2ec;
+    }
+    .login-btn {
+      width: 100%;
+      margin-top: 6px;
+      background: #1566b6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 13px 0;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .login-btn:hover { background: #0f5294; }
+    .error-message {
+      color: #c0392b;
+      background: #fdecea;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: .95rem;
+      display: none;
+    }
+    .error-message.show { display: block; }
+    .uc-login-footer { text-align: center; margin-top: 20px; font-size: .92rem; }
+    .uc-login-footer a { color: #1566b6; text-decoration: none; }
+    .uc-login-footer a:hover { text-decoration: underline; }
+  </style>
+<div class="uc-login-wrap">
+<div id="app">
+  <div class="uc-login-card">
+    <div class="uc-login-title">用户注册</div>
+    <p class="uc-login-sub">注册普通用户账号 · 注册成功后自动登录用户中心</p>
+    @Html.AntiForgeryToken()
+    <div class="uc-form">
+      <div :class="{show:errorMessage}" class="error-message">{{ errorMessage }}</div>
+      <div class="input-group">
+        <label for="username">用户名</label>
+        <input id="username" maxlength="20" placeholder="3-20 位，注册后用于登录" required type="text" v-model="username">
+      </div>
+      <div class="input-group">
+        <label for="nickname">昵称（可不填）</label>
+        <input id="nickname" maxlength="30" placeholder="不填则与用户名相同" type="text" v-model="nickname">
+      </div>
+      <div class="input-group">
+        <label for="email">邮箱</label>
+        <input id="email" maxlength="100" placeholder="请输入常用邮箱" required type="email" v-model="email">
+      </div>
+      <div class="input-group">
+        <label for="password">密码</label>
+        <input id="password" maxlength="20" placeholder="6-20 位" required type="password" v-model="password">
+      </div>
+      <div class="input-group">
+        <label for="passwordConfirm">确认密码</label>
+        <input id="passwordConfirm" maxlength="20" placeholder="再次输入密码" required type="password" v-model="passwordConfirm" @@keyup.enter="handleRegister">
+      </div>
+      <div class="input-group">
+        <label for="captcha">验证码</label>
+        <div class="captcha-group">
+          <input autocomplete="off" id="captcha" maxlength="4" placeholder="请输入验证码" required type="text" v-model="captchaInput" @@keyup.enter="handleRegister">
+          <img :src="captchaImgUrl" @@click="refreshCaptcha" alt="验证码" class="captcha-img" title="点击刷新">
+        </div>
+      </div>
+      <button @@click="handleRegister" class="login-btn" type="submit">注册并登录</button>
+    </div>
+    <div class="uc-login-footer">
+      <a href="@loginUrl">已有账号？去登录</a>
+      <span style="margin: 0 8px; color: #ccc;">|</span>
+      <a href="/">← 返回博客首页</a>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.16/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.5.4/jsencrypt.min.js"></script>
+<script>
+      const returnUrl = @Json.Serialize(returnUrl);
+      const { createApp } = Vue;
+      createApp({
+        data() {
+          return {
+            username: '',
+            nickname: '',
+            email: '',
+            password: '',
+            passwordConfirm: '',
+            captchaInput: '',
+            ramdom: Date.now(),
+            errorMessage: '',
+          }
+        },
+        computed: {
+          captchaImgUrl() {
+            return `/Passport/ValidateCode?t=${this.ramdom || Date.now()}`;
+          }
+        },
+        methods: {
+          refreshCaptcha() {
+            this.ramdom = Date.now();
+          },
+          async handleRegister() {
+            this.errorMessage = '';
+            const username = this.username.trim();
+            if (username.length < 3 || username.length > 20 || /\s/.test(username)) {
+              this.errorMessage = "用户名需为3-20位且不能包含空白字符";
+              return;
+            }
+            if (this.nickname.trim().length > 30) {
+              this.errorMessage = "昵称长度不能超过30位";
+              return;
+            }
+            const email = this.email.trim();
+            if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
+              this.errorMessage = "邮箱格式不正确";
+              return;
+            }
+            if (this.password.length < 6 || this.password.length > 20) {
+              this.errorMessage = "密码长度需为6-20位";
+              return;
+            }
+            if (this.password !== this.passwordConfirm) {
+              this.errorMessage = "两次输入的密码不一致";
+              return;
+            }
+            if (this.captchaInput.trim().length < 4) {
+              this.errorMessage = "请输入4位验证码";
+              return;
+            }
+            const cookie = await cookieStore.get("PublicKey");
+            var encrypt = new JSEncrypt();
+            encrypt.setPublicKey(decodeURIComponent(cookie.value));
+            axios.create({
+        headers: {
+          'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+        }
+      }).post('/UserCenter/Register', {
+              username: username,
+              nickname: this.nickname.trim(),
+              email: email,
+              password: encrypt.encrypt(this.password),
+              passwordConfirm: encrypt.encrypt(this.passwordConfirm),
+              valid: this.captchaInput.trim(),
+              returnUrl: returnUrl
+            }).then(res => {
+              if (res.data.Success) {
+                window.location.href = res.data.Data || returnUrl;
+              } else {
+                this.errorMessage = res.data.Message || '注册失败，请重试';
+                this.refreshCaptcha();
+                this.captchaInput = '';
+              }
+            }).catch(() => {
+              this.errorMessage = '网络异常，请稍后重试';
+              this.refreshCaptcha();
+              this.captchaInput = '';
+            });
+          }
+        },
+        mounted() {
+          this.refreshCaptcha();
+        }
+      }).mount('#app')
+</script>
+</div>

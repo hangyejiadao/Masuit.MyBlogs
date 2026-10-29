@@ -115,6 +115,8 @@ public sealed class HangfireBackJob : Disposable, IHangfireBackJob
         var userInfoService = _serviceScope.ServiceProvider.GetRequiredService<IUserInfoService>();
         var settingService = _serviceScope.ServiceProvider.GetRequiredService<ISystemSettingService>();
         var u = userInfoService.GetByUsername(userInfo.Username);
+        // 登录记录必须关联到用户，否则后台按用户 id 查最近登录记录（/login/getrecent/{id}）永远查不到（历史记录曾因此全部落成 UserInfoId=0 的孤儿数据）
+        record.UserInfoId = u?.Id ?? userInfo.Id;
         var recordService = _serviceScope.ServiceProvider.GetRequiredService<ILoginRecordService>();
         recordService.AddEntity(record);
         recordService.SaveChanges();

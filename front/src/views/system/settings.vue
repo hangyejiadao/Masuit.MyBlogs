@@ -163,6 +163,17 @@
       </div>
     </q-card-section>
   </q-card>
+  <!-- MCP 智能体配置 -->
+  <q-card flat bordered>
+    <q-card-section>
+      <div class="text-h6">MCP 智能体发布</div>
+      <div class="row q-gutter-md">
+        <div class="col">
+          <q-input v-model="settings.McpPublishToken" label="MCP 发布令牌（Bearer）" outlined dense type="password" hint="外部 AI 智能体通过 MCP 接口（POST /api/mcp）发布/维护文章时使用此令牌鉴权；请设置一个足够长的随机字符串，留空表示关闭 MCP 接口" />
+        </div>
+      </div>
+    </q-card-section>
+  </q-card>
   <!-- 媒体设置 -->
   <q-card flat bordered>
     <q-card-section>
@@ -236,6 +247,7 @@ interface Settings {
   SMTP?: string
   SmtpPort?: string
   ReceiveEmail?: string
+  McpPublishToken?: string
   logo?: string
   Disclaimer?: string
   Copyright?: string

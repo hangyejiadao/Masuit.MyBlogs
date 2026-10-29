@@ -28,7 +28,7 @@ body {
 
 /*#region canvas背景 */
 
-#c {
+canvas#c {
   position: fixed;
   top: 0;
   bottom: 0;

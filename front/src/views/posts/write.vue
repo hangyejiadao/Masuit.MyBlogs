@@ -711,9 +711,9 @@ const uploadPastedImages = async (files: File[]): Promise<string[]> => {
   toast.info('正在上传粘贴的图片…', { autoClose: 1500, position: 'top-center' })
   for (const file of files) {
     try {
-      const named = file.name && file.name !== 'image.png'
-        ? file
-        : new File([file], `paste-${Date.now()}.png`, { type: file.type || 'image/png' })
+      const named = file.name && file.name !== 'image.png' ?
+        file :
+        new File([file], `paste-${Date.now()}.png`, { type: file.type || 'image/png' })
       const response = await PostApi.uploadImage(named)
       if (response?.Success && response.Data) {
         urls.push(response.Data)
@@ -767,10 +767,10 @@ const handleDocumentPaste = async (e: ClipboardEvent) => {
 // 富文本编辑器（UEditor）：在其 iframe 文档上以捕获阶段拦截粘贴，图片上传后插入 HTML 图片
 const boundPasteDocs = new WeakSet<Document>()
 const onEditorReady = (editorInstance: any) => {
-  const doc: Document | null = editorInstance?.document
-    ?? editorInstance?.iframe?.contentDocument
-    ?? editorInstance?.body?.ownerDocument
-    ?? null
+  const doc: Document | null = editorInstance?.document ??
+    editorInstance?.iframe?.contentDocument ??
+    editorInstance?.body?.ownerDocument ??
+    null
   if (!doc || boundPasteDocs.has(doc)) {
     return
   }

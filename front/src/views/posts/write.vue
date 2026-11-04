@@ -711,9 +711,9 @@ const uploadPastedImages = async (files: File[]): Promise<string[]> => {
   toast.info('正在上传粘贴的图片…', { autoClose: 1500, position: 'top-center' })
   for (const file of files) {
     try {
-      const named = file.name && file.name !== 'image.png' ?
-        file :
-        new File([file], `paste-${Date.now()}.png`, { type: file.type || 'image/png' })
+      const named = file.name && file.name !== 'image.png'
+        ? file
+        : new File([file], `paste-${Date.now()}.png`, { type: file.type || 'image/png' })
       const response = await PostApi.uploadImage(named)
       if (response?.Success && response.Data) {
         urls.push(response.Data)

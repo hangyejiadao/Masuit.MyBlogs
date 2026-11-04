@@ -24,7 +24,7 @@
             { label: 'Markdown', value: 1 }
           ]" no-caps unelevated dense />
       </div>
-      <vue-ueditor-wrap v-if="post.ContentType === 0" ref="editor" v-model="post.Content" :config="{ initialFrameHeight: 500 }" />
+      <vue-ueditor-wrap v-if="post.ContentType === 0" ref="editor" v-model="post.Content" :config="{ initialFrameHeight: 500 }" @ready="onEditorReady" />
       <v-md-editor v-else v-model="post.Content" height="500px" placeholder="请输入 Markdown 内容" />
     </q-card-section>
   </q-card>
@@ -49,7 +49,7 @@
         <q-input autogrow dense v-if="post.ProtectContentMode === 4" v-model="post.ProtectPassword" label="访问密码" type="password" outlined />
       </div>
       <div v-if="post.ProtectContentMode > 0">
-        <vue-ueditor-wrap ref="protectContentEditor" v-model="post.ProtectContent" :config="{ initialFrameHeight: 300 }" />
+        <vue-ueditor-wrap ref="protectContentEditor" v-model="post.ProtectContent" :config="{ initialFrameHeight: 300 }" @ready="onEditorReady" />
       </div>
     </q-card-section>
   </q-card>
@@ -211,7 +211,7 @@
 </div>
 </template>
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PostApi } from '@/api/PostApi'
 import type { PostData, Category, Tag, Seminar } from '@/api/PostApi'
@@ -679,7 +679,120 @@ const loadReferPost = async () => {
   }
 }
 
+// ================= 粘贴图片上传（图床） =================
+// 从粘贴事件中提取剪贴板里的图片文件
+const extractClipboardImages = (e: ClipboardEvent): File[] => {
+  const files: File[] = []
+  const data = e.clipboardData
+  if (!data) {
+    return files
+  }
+  for (const file of Array.from(data.files)) {
+    if (file.type.startsWith('image/')) {
+      files.push(file)
+    }
+  }
+  if (!files.length && data.items) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) {
+          files.push(file)
+        }
+      }
+    }
+  }
+  return files
+}
+
+// 逐个上传粘贴的图片，返回上传成功的图片地址
+const uploadPastedImages = async (files: File[]): Promise<string[]> => {
+  const urls: string[] = []
+  toast.info('正在上传粘贴的图片…', { autoClose: 1500, position: 'top-center' })
+  for (const file of files) {
+    try {
+      const named = file.name && file.name !== 'image.png'
+        ? file
+        : new File([file], `paste-${Date.now()}.png`, { type: file.type || 'image/png' })
+      const response = await PostApi.uploadImage(named)
+      if (response?.Success && response.Data) {
+        urls.push(response.Data)
+      } else {
+        toast.error(response?.Message || '图片上传失败', { autoClose: 2500, position: 'top-center' })
+      }
+    } catch (error) {
+      console.error('粘贴图片上传失败:', error)
+      toast.error('图片上传失败', { autoClose: 2500, position: 'top-center' })
+    }
+  }
+  if (urls.length) {
+    toast.success('图片上传成功', { autoClose: 1500, position: 'top-center' })
+  }
+  return urls
+}
+
+// Markdown 编辑器：拦截粘贴，图片上传后在光标处插入 Markdown 图片语法
+const handleDocumentPaste = async (e: ClipboardEvent) => {
+  if (post.ContentType !== 1) {
+    return
+  }
+  const mdRoot = document.querySelector('.v-md-editor')
+  if (!mdRoot || !(e.target instanceof Node) || !mdRoot.contains(e.target)) {
+    return
+  }
+  const files = extractClipboardImages(e)
+  if (!files.length) {
+    return
+  }
+  e.preventDefault()
+  const urls = await uploadPastedImages(files)
+  if (!urls.length) {
+    return
+  }
+  const insertText = urls.map(url => `![](${url})`).join('\n') + '\n'
+  const textarea = mdRoot.querySelector('textarea') as HTMLTextAreaElement | null
+  if (textarea) {
+    const start = textarea.selectionStart ?? post.Content.length
+    const end = textarea.selectionEnd ?? start
+    post.Content = post.Content.slice(0, start) + insertText + post.Content.slice(end)
+    await nextTick()
+    textarea.focus()
+    const pos = start + insertText.length
+    textarea.setSelectionRange(pos, pos)
+  } else {
+    post.Content += (post.Content && !post.Content.endsWith('\n') ? '\n' : '') + insertText
+  }
+}
+
+// 富文本编辑器（UEditor）：在其 iframe 文档上以捕获阶段拦截粘贴，图片上传后插入 HTML 图片
+const boundPasteDocs = new WeakSet<Document>()
+const onEditorReady = (editorInstance: any) => {
+  const doc: Document | null = editorInstance?.document
+    ?? editorInstance?.iframe?.contentDocument
+    ?? editorInstance?.body?.ownerDocument
+    ?? null
+  if (!doc || boundPasteDocs.has(doc)) {
+    return
+  }
+  boundPasteDocs.add(doc)
+  doc.addEventListener('paste', async (e: ClipboardEvent) => {
+    const files = extractClipboardImages(e)
+    if (!files.length) {
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    const urls = await uploadPastedImages(files)
+    if (!urls.length) {
+      return
+    }
+    editorInstance.focus()
+    editorInstance.execCommand('inserthtml', urls.map(url => `<img src="${url}" />`).join(''))
+  }, true)
+}
+
 onMounted(async () => {
+  document.addEventListener('paste', handleDocumentPaste)
   const user = await userStore.getUserInfo();
   post.Author = user.NickName
   post.Email = user.Email
@@ -695,6 +808,7 @@ onMounted(async () => {
 
 // 组件卸载
 onUnmounted(() => {
+  document.removeEventListener('paste', handleDocumentPaste)
   if (draftTimer) {
     clearInterval(draftTimer)
   }

@@ -125,6 +125,21 @@ export class PostApi {
   }
 
   /**
+   * 上传图片（服务端走图床，返回图片访问地址）
+   */
+  static async uploadImage(file: File): Promise<ApiResponse<string>> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await api.post('/Upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response
+  }
+
+  /**
    * 获取地区列表
    */
   static async getRegions(name: string = 'Regions'): Promise<ApiResponse<string[]>> {

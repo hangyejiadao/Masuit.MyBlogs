@@ -37,11 +37,7 @@ public sealed class ImagebedClient
     /// <returns></returns>
     public Task<(string url, bool success)> UploadImage(Stream stream, string file, CancellationToken cancellationToken)
     {
-        if (stream.Length < 51200)
-        {
-            return Task.FromResult<(string, bool)>((null, false));
-        }
-
+        // 不再按大小过滤：所有图片都上传到图床（用户 2026-11-04 要求），上传失败时由调用方回退本地存储
         file = Regex.Replace(Path.GetFileName(file), @"\p{P}|\p{S}", "");
         var gitlabs = AppConfig.GitlabConfigs.Where(c => c.FileLimitSize >= stream.Length && !_failedList.Contains(c.ApiUrl)).OrderByRandom().ToArray();
         if (gitlabs.Length > 0)

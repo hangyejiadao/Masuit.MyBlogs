@@ -42,7 +42,7 @@ services:
   reverse-tunnel-client:
     build: ./src/Masuit.ReverseTunnel.Client
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:8080"
     volumes:
       - ./reverse-tunnel-data:/data
     extra_hosts:
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 ```
 
-打开 `http://127.0.0.1:8080/` 配置客户端。目标服务在宿主机时填写 `host.docker.internal`；目标服务在同一 Compose 网络时填写服务名。客户端管理页面没有内置用户系统，生产环境必须限制管理端口来源，或在反向代理层增加 HTTPS 与认证。配置查询接口不会回传 SQLite 中的明文密钥，保存配置时密钥留空表示沿用原密钥。
+打开 `http://127.0.0.1:18080/` 配置客户端。容器内部仍监听 `8080`，宿主机通过 `18080` 访问。目标服务在宿主机时填写 `host.docker.internal`；目标服务在同一 Compose 网络时填写服务名。客户端管理页面没有内置用户系统，生产环境必须限制管理端口来源，或在反向代理层增加 HTTPS 与认证。配置查询接口不会回传 SQLite 中的明文密钥，保存配置时密钥留空表示沿用原密钥。
 
 ## 验收门禁
 

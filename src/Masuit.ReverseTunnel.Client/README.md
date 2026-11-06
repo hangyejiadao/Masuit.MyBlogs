@@ -1,6 +1,6 @@
 # Masuit Reverse Tunnel Web Client
 
-这是内网穿透客户端的 Web/Docker 版本。容器启动后打开 `http://客户端地址:8080/`，填写服务端地址、隧道编号、服务端密钥和内网目标服务即可。
+这是内网穿透客户端的 Web/Docker 版本。容器启动后打开 `http://客户端地址:18080/`，填写服务端地址、隧道编号、服务端密钥和内网目标服务即可。
 
 ## SQLite 持久化
 
@@ -11,7 +11,7 @@ services:
   reverse-tunnel-client:
     build: .
     ports:
-      - "8080:8080"
+      - "18080:8080"
     volumes:
       - ./data:/data
     extra_hosts:

@@ -8,6 +8,7 @@ using Hangfire.MemoryStorage;
 using Masuit.LuceneEFCore.SearchEngine;
 using Masuit.LuceneEFCore.SearchEngine.Extensions;
 using Masuit.MyBlogs.Core.Common.Mails;
+using Masuit.MyBlogs.Core.Common.ReverseTunnel;
 using Masuit.MyBlogs.Core.Configs;
 using Masuit.MyBlogs.Core.Extensions;
 using Masuit.MyBlogs.Core.Extensions.Firewall;
@@ -113,7 +114,9 @@ public class Startup
         services.AddSingleton<VedioMetadataCache>();
         services.AddHttpClient("VedioTmdb", client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-        services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration).AddPortForward();
+		services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration).AddPortForward();
+		services.Configure<ReverseTunnelOptions>(Configuration.GetSection("ReverseTunnel"));
+		services.AddSingleton<ReverseTunnelHub>();
         services.AddBundling().UseDefaults(_env).UseNUglify().EnableMinification().EnableChangeDetection().EnableCacheHeader(TimeSpan.FromHours(1));
         services.AddSingleton<IRedisClient>(new RedisClient(AppConfig.Redis)
         {
@@ -168,6 +171,8 @@ public class Startup
         {
             app.UseExceptionHandler("/ServiceUnavailable");
         }
+		app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
+		app.UseMiddleware<ReverseTunnelMiddleware>();
         app.UseMiddleware<PortForwardProxyMiddleware>(); //端口转发路径代理：命中规则路径时剥前缀代理并短路管道，不走博客自身逻辑
         app.UseReleaseMetadata(env);
         app.UseMiddleware<HttpRequestLoggingMiddleware>();

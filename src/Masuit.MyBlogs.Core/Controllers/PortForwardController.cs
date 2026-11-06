@@ -1,6 +1,8 @@
 using Masuit.MyBlogs.Core.Common;
+using Masuit.MyBlogs.Core.Common.ReverseTunnel;
 using Masuit.MyBlogs.Core.Extensions;
 using Masuit.Tools.AspNetCore.ModelBinder;
+using System.Text.RegularExpressions;
 
 namespace Masuit.MyBlogs.Core.Controllers;
 
@@ -73,10 +75,13 @@ return new
 {
 r.Id,
 r.Name,
+			r.Mode,
 r.ListenPort,
 r.TargetHost,
 r.TargetPort,
 r.Path,
+			r.TunnelId,
+			TunnelTokenConfigured = !string.IsNullOrWhiteSpace(r.TunnelTokenHash),
 r.Enabled,
 r.Remark,
 status.IsListening,
@@ -104,12 +109,12 @@ if (cmd == null || string.IsNullOrWhiteSpace(cmd.Name))
 return ResultData(null, false, "规则名称不能为空！");
 }
 
-if (string.IsNullOrWhiteSpace(cmd.TargetHost))
-{
-return ResultData(null, false, "目标地址不能为空！");
-}
+		if (!Enum.IsDefined(cmd.Mode))
+		{
+			return ResultData(null, false, "转发模式不正确！");
+		}
 
-if (cmd.ListenPort is < 1 or > 65535 || cmd.TargetPort is < 1 or > 65535)
+if (cmd.ListenPort is < 1 or > 65535 || cmd.Mode == PortForwardMode.Direct && cmd.TargetPort is < 1 or > 65535)
 {
 return ResultData(null, false, "监听端口和目标端口必须在 1-65535 之间！");
 }
@@ -128,12 +133,55 @@ if (PortForwardRuleService.Any(r => r.ListenPort == cmd.ListenPort && r.Id!= cmd
 {
 return ResultData(null, false, $"监听端口 {cmd.ListenPort} 已被其他规则占用，请更换！");
 }
-
-var path = cmd.Path?.Trim();
-if (string.IsNullOrEmpty(path))
-{
-path = null;
-}
+		var path = cmd.Path?.Trim();
+		if (string.IsNullOrEmpty(path))
+		{
+			path = null;
+		}
+		var tunnelId = cmd.TunnelId?.Trim().ToLowerInvariant();
+		var tunnelToken = cmd.TunnelToken?.Trim();
+		string tunnelTokenHash = null;
+		if (cmd.Mode == PortForwardMode.Direct)
+		{
+			if (string.IsNullOrWhiteSpace(cmd.TargetHost))
+			{
+				return ResultData(null, false, "普通直连模式的目标地址不能为空！");
+			}
+			if (cmd.TargetPort is < 1 or > 65535)
+			{
+				return ResultData(null, false, "目标端口必须在 1-65535 之间！");
+			}
+			tunnelId = null;
+		}
+		else
+		{
+			if (string.IsNullOrWhiteSpace(tunnelId) || tunnelId.Length > 64 || !Regex.IsMatch(tunnelId, "^[A-Za-z0-9_-]+$"))
+			{
+				return ResultData(null, false, "内网穿透编号只能包含字母、数字、连字符和下划线，长度不超过 64！");
+			}
+			if (PortForwardRuleService.Any(r => r.Mode == PortForwardMode.ReverseTunnel && r.TunnelId == tunnelId && r.Id != cmd.Id))
+			{
+				return ResultData(null, false, $"内网穿透编号 {tunnelId} 已被其他规则使用！");
+			}
+			if (cmd.Id == 0 && string.IsNullOrWhiteSpace(tunnelToken))
+			{
+				return ResultData(null, false, "新建内网穿透规则必须设置令牌！");
+			}
+			if (!string.IsNullOrWhiteSpace(tunnelToken) && (tunnelToken.Length < 16 || tunnelToken.Length > 256))
+			{
+				return ResultData(null, false, "内网穿透令牌长度必须在 16-256 个字符之间！");
+			}
+			if (!string.IsNullOrWhiteSpace(tunnelToken))
+			{
+				tunnelTokenHash = ReverseTunnelHub.HashToken(tunnelToken);
+			}
+			if (!string.IsNullOrWhiteSpace(path))
+			{
+				return ResultData(null, false, "内网穿透模式不支持路径转发，请清空路径！");
+			}
+			cmd.TargetHost = string.Empty;
+			cmd.TargetPort = 0;
+		}
 
 if (path!= null)
 {
@@ -163,6 +211,16 @@ rule.Name = cmd.Name.Trim();
 rule.ListenPort = cmd.ListenPort;
 rule.TargetHost = cmd.TargetHost.Trim();
 rule.TargetPort = cmd.TargetPort;
+		rule.Mode = cmd.Mode;
+		rule.TunnelId = tunnelId;
+		if (cmd.Mode == PortForwardMode.ReverseTunnel && tunnelTokenHash != null)
+		{
+			rule.TunnelTokenHash = tunnelTokenHash;
+		}
+		if (cmd.Mode == PortForwardMode.Direct)
+		{
+			rule.TunnelTokenHash = null;
+		}
 rule.Path = path;
 rule.Enabled = cmd.Enabled;
 rule.Remark = cmd.Remark?.Trim();
@@ -178,10 +236,13 @@ return ResultData(null, ok, ok? "规则已更新，转发已同步生效": "规�
 var added = PortForwardRuleService.AddEntitySaved(new PortForwardRule
 {
 Name = cmd.Name.Trim(),
+			Mode = cmd.Mode,
 ListenPort = cmd.ListenPort,
 TargetHost = cmd.TargetHost.Trim(),
 TargetPort = cmd.TargetPort,
 Path = path,
+			TunnelId = tunnelId,
+			TunnelTokenHash = tunnelTokenHash,
 Enabled = cmd.Enabled,
 Remark = cmd.Remark?.Trim(),
 Status = Status.Available

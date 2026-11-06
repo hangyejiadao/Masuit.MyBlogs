@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using EntityFramework.Exceptions.Common;
 using EntityFramework.Exceptions.PostgreSQL;
 using Masuit.MyBlogs.Core.Extensions.Firewall;
@@ -43,6 +43,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<AppOrder>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AppOrder>().HasOne(e => e.IssuedLicense).WithMany().HasForeignKey(e => e.IssuedLicenseId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.ListenPort).IsUnique();
+        modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.TunnelId).IsUnique().HasFilter("\"TunnelId\" IS NOT NULL");
         modelBuilder.Entity<BrakeLeaderboardEntry>().HasIndex(e => e.Ip).IsUnique();
 
         modelBuilder.Entity<Menu>().HasMany(e => e.Children).WithOne(m => m.Parent).IsRequired(false).OnDelete(DeleteBehavior.Cascade);

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>内网穿透客户端</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f4f6f8; color: #1f2937; }
+    main { max-width: 760px; margin: 32px auto; padding: 0 18px; }
+    section { background: #fff; border: 1px solid #d9dee5; border-radius: 8px; padding: 22px; box-shadow: 0 2px 8px #1f293710; }
+    h1 { margin: 0 0 20px; font-size: 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { display: grid; gap: 6px; font-size: 14px; color: #4b5563; }
+    label.full { grid-column: 1 / -1; }
+    input { box-sizing: border-box; width: 100%; border: 1px solid #cbd5e1; border-radius: 5px; padding: 10px; font: inherit; }
+    .actions { display: flex; gap: 10px; margin-top: 20px; }
+    button { border: 0; border-radius: 5px; padding: 10px 16px; cursor: pointer; font: inherit; }
+    #save { background: #2563eb; color: #fff; } #connect { background: #16a34a; color: #fff; } #disconnect { background: #6b7280; color: #fff; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .status { margin-top: 18px; padding: 12px; background: #f8fafc; border-left: 4px solid #94a3b8; white-space: pre-wrap; }
+    .hint { margin: 16px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } label.full { grid-column: auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>内网穿透客户端</h1>
+    <div class="grid">
+      <label class="full">服务端地址
+        <input id="serverUrl" placeholder="https://example.com">
+      </label>
+      <label>隧道编号
+        <input id="tunnelId" placeholder="office-pc">
+      </label>
+      <label>服务端密钥
+        <input id="token" type="password" autocomplete="off" placeholder="至少 16 个字符">
+      </label>
+      <label>本地目标主机
+        <input id="localHost" value="127.0.0.1">
+      </label>
+      <label>本地目标端口
+        <input id="localPort" type="number" min="1" max="65535" value="80">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="save">保存配置</button>
+      <button id="connect">连接</button>
+      <button id="disconnect">断开</button>
+    </div>
+    <div id="status" class="status">正在读取状态...</div>
+    <p class="hint">配置保存到客户端容器的 SQLite 数据库。请挂载 <code>/data</code>，并限制此管理页面只允许可信网络访问。</p>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fields = ['serverUrl', 'tunnelId', 'token', 'localHost', 'localPort'];
+function readForm() { return { ServerUrl: $('serverUrl').value, TunnelId: $('tunnelId').value, Token: $('token').value, LocalHost: $('localHost').value, LocalPort: Number($('localPort').value), Enabled: false }; }
+function show(message) { $('status').textContent = message; }
+function fill(data) { for (const field of fields) { const key = field[0].toUpperCase() + field.slice(1); if (data[key] !== undefined) $(field).value = data[key]; } }
+async function request(url, options) { const response = await fetch(url, { headers: {'Content-Type': 'application/json'}, ...options }); const data = await response.json(); if (!response.ok) throw new Error(data.message || '请求失败'); return data; }
+async function loadConfig() { try { fill(await request('/api/config')); await refreshStatus(); } catch (error) { show(error.message); } }
+async function save() { try { await request('/api/config', { method: 'PUT', body: JSON.stringify(readForm()) }); show('配置已保存，当前未连接。'); await refreshStatus(); } catch (error) { show(error.message); } }
+async function connect() { try { await request('/api/config', { method: 'PUT', body: JSON.stringify(readForm()) }); await request('/api/connect', { method: 'POST' }); show('正在连接服务端...'); await refreshStatus(); } catch (error) { show(error.message); } }
+async function disconnect() { try { await request('/api/disconnect', { method: 'POST' }); show('已断开连接。'); await refreshStatus(); } catch (error) { show(error.message); } }
+async function refreshStatus() { try { const data = await request('/api/status'); show(`状态：${data.state}\n${data.lastError ? '错误：' + data.lastError : ''}${data.connectedAt ? '\n连接时间：' + data.connectedAt : ''}`); } catch (error) { show(error.message); } }
+$('save').onclick = save; $('connect').onclick = connect; $('disconnect').onclick = disconnect; loadConfig(); setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>

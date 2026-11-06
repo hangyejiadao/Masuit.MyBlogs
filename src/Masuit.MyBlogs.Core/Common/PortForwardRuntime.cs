@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using Masuit.MyBlogs.Core.Common.ReverseTunnel;
 
 namespace Masuit.MyBlogs.Core.Common;
 
@@ -88,7 +89,7 @@ public sealed class PortForwardStatus
 /// 以单例 + 宿主服务形式运行，规则增删改后由控制器调用 <see cref="ReloadAsync"/> 即时对齐监听，无需重启应用。
 /// 单条规则监听失败（端口被占用等）只记录该规则的状态并写日志，不影响应用和其他规则。
 /// </summary>
-public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogger<PortForwardRuntime> logger) : IHostedService
+public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogger<PortForwardRuntime> logger, ReverseTunnelHub reverseTunnelHub) : IHostedService
 {
 	/// <summary>
 	/// 连接目标主机时等待的最长秒数，超时放弃该连接
@@ -156,6 +157,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 				await forward.StopAsync();
 			}
 		}
+		reverseTunnelHub.UpdateRules([]);
 	}
 
 	/// <summary>
@@ -178,7 +180,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 					rules = service.GetQuery(r => r.Enabled).ToList();
 				}
 
-				_pathTargets = rules.Where(r => !string.IsNullOrWhiteSpace(r.Path))
+				_pathTargets = rules.Where(r => r.Mode == PortForwardMode.Direct && !string.IsNullOrWhiteSpace(r.Path))
 					.Select(r => new PortForwardPathTarget
 					{
 						RuleId = r.Id,
@@ -188,6 +190,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 					})
 					.OrderByDescending(t => t.Path.Length)
 					.ToArray();
+				reverseTunnelHub.UpdateRules(rules);
 
 				var desired = rules.ToDictionary(r => r.Id);
 				foreach (var ruleId in _active.Keys)
@@ -287,7 +290,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	/// </summary>
 	/// <param name="rule"></param>
 	/// <returns></returns>
-	private static string Fingerprint(PortForwardRule rule) => $"{rule.ListenPort}|{rule.TargetHost}|{rule.TargetPort}";
+	private static string Fingerprint(PortForwardRule rule) => $"{rule.Mode}|{rule.ListenPort}|{rule.TargetHost}|{rule.TargetPort}|{rule.TunnelId}|{rule.TunnelTokenHash}";
 
 	/// <summary>
 	/// 为一条规则创建监听并开始接受连接；绑定失败时记录原因供界面展示并写日志，不向上抛错
@@ -311,7 +314,14 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		_active[rule.Id] = forward;
 		_startErrors.TryRemove(rule.Id, out _);
 		forward.AcceptTask = AcceptLoopAsync(forward);
-		logger.LogInformation("端口转发已启动：{ListenPort} -> {TargetHost}:{TargetPort}（规则 {RuleId}）", rule.ListenPort, rule.TargetHost, rule.TargetPort, rule.Id);
+		if (rule.Mode == PortForwardMode.ReverseTunnel)
+		{
+			logger.LogInformation("内网穿透公网监听已启动：{ListenPort} <- {TunnelId}（规则 {RuleId}）", rule.ListenPort, rule.TunnelId, rule.Id);
+		}
+		else
+		{
+			logger.LogInformation("端口转发已启动：{ListenPort} -> {TargetHost}:{TargetPort}（规则 {RuleId}）", rule.ListenPort, rule.TargetHost, rule.TargetPort, rule.Id);
+		}
 	}
 
 	/// <summary>
@@ -383,6 +393,18 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		Interlocked.Increment(ref forward.Counters.TotalConnections);
 		Interlocked.Increment(ref forward.Counters.ActiveConnections);
 		using var clientScope = client;
+		if (forward.Rule.Mode == PortForwardMode.ReverseTunnel)
+		{
+			try
+			{
+				await reverseTunnelHub.ForwardAsync(forward.Rule, client, forward.Counters, forward.StopSource.Token);
+			}
+			finally
+			{
+				Interlocked.Decrement(ref forward.Counters.ActiveConnections);
+			}
+			return;
+		}
 		using var remote = new TcpClient();
 		try
 		{
@@ -461,7 +483,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		/// <summary>
 		/// 决定是否需要重启监听的规则指纹
 		/// </summary>
-		public string Fingerprint { get; } = $"{rule.ListenPort}|{rule.TargetHost}|{rule.TargetPort}";
+		public string Fingerprint { get; } = $"{rule.Mode}|{rule.ListenPort}|{rule.TargetHost}|{rule.TargetPort}|{rule.TunnelId}|{rule.TunnelTokenHash}";
 
 		/// <summary>
 		/// 已开始监听的套接字

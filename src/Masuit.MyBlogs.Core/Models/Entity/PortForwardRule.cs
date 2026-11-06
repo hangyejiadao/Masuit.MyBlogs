@@ -8,6 +8,11 @@ namespace Masuit.MyBlogs.Core.Models.Entity;
 public class PortForwardRule : BaseEntity
 {
 	/// <summary>
+	/// 转发模式：普通直连或内网客户端主动连接的反向隧道。
+	/// </summary>
+	public PortForwardMode Mode { get; set; }
+
+	/// <summary>
 	/// 规则名称
 	/// </summary>
 	[Required(ErrorMessage = "规则名称不能为空！"), MaxLength(64)]
@@ -46,4 +51,32 @@ public class PortForwardRule : BaseEntity
 	/// </summary>
 	[MaxLength(512)]
 	public string Remark { get; set; }
+
+	/// <summary>
+	/// 反向隧道客户端注册使用的唯一编号；普通直连模式为空。
+	/// </summary>
+	[MaxLength(64)]
+	public string TunnelId { get; set; }
+
+	/// <summary>
+	/// 反向隧道令牌的 SHA-256 摘要；不保存明文令牌，普通直连模式为空。
+	/// </summary>
+	[MaxLength(64)]
+	public string TunnelTokenHash { get; set; }
+}
+
+/// <summary>
+/// 端口转发的传输模式。
+/// </summary>
+public enum PortForwardMode
+{
+	/// <summary>
+	/// 服务端主动连接目标主机。
+	/// </summary>
+	Direct = 0,
+
+	/// <summary>
+	/// 内网客户端主动连接服务端，服务端把公网连接转交给客户端。
+	/// </summary>
+	ReverseTunnel = 1
 }

@@ -6,6 +6,11 @@ namespace Masuit.MyBlogs.Core.Models.Command;
 public class PortForwardRuleCommand
 {
 	/// <summary>
+	/// 转发模式：0 为普通直连，1 为内网穿透。
+	/// </summary>
+	public PortForwardMode Mode { get; set; }
+
+	/// <summary>
 	/// 规则id，0 表示新建
 	/// </summary>
 	public int Id { get; set; }
@@ -44,6 +49,16 @@ public class PortForwardRuleCommand
 	/// 备注
 	/// </summary>
 	public string Remark { get; set; }
+
+	/// <summary>
+	/// 内网穿透客户端注册编号；普通直连模式为空。
+	/// </summary>
+	public string TunnelId { get; set; }
+
+	/// <summary>
+	/// 内网穿透明文令牌；编辑时留空表示沿用原令牌，服务端不会回传原令牌。
+	/// </summary>
+	public string TunnelToken { get; set; }
 }
 
 /// <summary>

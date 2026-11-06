@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "工具库", "工具库", "{
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Masuit.Tools.Excel", "Masuit.Tools\Masuit.Tools.Excel\Masuit.Tools.Excel.csproj", "{99933B01-597A-40F7-81D7-8BDA3CD4D840}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Masuit.ReverseTunnel.Client", "Masuit.ReverseTunnel.Client\Masuit.ReverseTunnel.Client.csproj", "{9124F197-074E-4766-96B6-FDD9FDC31C1E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,10 @@ Global
 		{99933B01-597A-40F7-81D7-8BDA3CD4D840}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99933B01-597A-40F7-81D7-8BDA3CD4D840}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{99933B01-597A-40F7-81D7-8BDA3CD4D840}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9124F197-074E-4766-96B6-FDD9FDC31C1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9124F197-074E-4766-96B6-FDD9FDC31C1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9124F197-074E-4766-96B6-FDD9FDC31C1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9124F197-074E-4766-96B6-FDD9FDC31C1E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

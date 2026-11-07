@@ -375,7 +375,19 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 			catch (Exception ex)
 			{
 				logger.LogError(ex, "端口转发接受连接失败，规则={RuleId}，监听端口={ListenPort}", forward.Rule.Id, forward.Rule.ListenPort);
-				break;
+				if (forward.StopSource.IsCancellationRequested)
+				{
+					break;
+				}
+				try
+				{
+					await Task.Delay(TimeSpan.FromSeconds(1), forward.StopSource.Token);
+				}
+				catch (OperationCanceledException) when (forward.StopSource.IsCancellationRequested)
+				{
+					break;
+				}
+				continue;
 			}
 
 			_ = HandleConnectionAsync(forward, client);

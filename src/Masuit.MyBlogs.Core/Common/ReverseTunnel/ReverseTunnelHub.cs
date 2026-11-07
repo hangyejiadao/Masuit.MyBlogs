@@ -168,12 +168,14 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 	/// <returns>连接关闭后完成的任务。</returns>
 	public async Task ForwardAsync(PortForwardRule rule, TcpClient client, PortForwardCounters counters, CancellationToken cancellationToken)
 	{
-		if (string.IsNullOrWhiteSpace(rule.TunnelId) || !_sessions.TryGetValue(rule.TunnelId, out var session))
+		string tunnelId = rule.TunnelId?.Trim() ?? string.Empty;
+		if (tunnelId.Length == 0 || !_sessions.TryGetValue(tunnelId, out var session))
 		{
+			logger.LogWarning("公网连接到达但内网隧道控制会话不存在，规则={RuleId}，隧道={TunnelId}，监听端口={ListenPort}", rule.Id, tunnelId, rule.ListenPort);
 			return;
 		}
 		var connectionId = Guid.NewGuid().ToString("N");
-		var pending = new PendingConnection(connectionId, rule.TunnelId, client);
+		var pending = new PendingConnection(connectionId, tunnelId, client);
 		if (!_pending.TryAdd(connectionId, pending))
 		{
 			return;
@@ -197,12 +199,27 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		}
 		catch (WebSocketException exception)
 		{
-			logger.LogWarning(exception, "内网隧道数据连接异常，规则={RuleId}，隧道={TunnelId}", rule.Id, rule.TunnelId);
+			logger.LogWarning(exception, "内网隧道数据连接异常，规则={RuleId}，隧道={TunnelId}", rule.Id, tunnelId);
+			RemoveSessionIfCurrent(tunnelId, session);
+		}
+		catch (Exception exception)
+		{
+			logger.LogWarning(exception, "内网隧道转发失败，规则={RuleId}，隧道={TunnelId}", rule.Id, tunnelId);
+			RemoveSessionIfCurrent(tunnelId, session);
 		}
 		finally
 		{
 			_pending.TryRemove(connectionId, out _);
 			pending.Complete();
+		}
+	}
+
+	private void RemoveSessionIfCurrent(string tunnelId, TunnelSession session)
+	{
+		if (_sessions.TryGetValue(tunnelId, out var current) && ReferenceEquals(current, session))
+		{
+			_sessions.TryRemove(tunnelId, out _);
+			session.Stop();
 		}
 	}
 

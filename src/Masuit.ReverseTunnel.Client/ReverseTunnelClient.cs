@@ -89,16 +89,16 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		try
 		{
 			await data.ConnectAsync(BuildEndpointUri(configuration.ServerUrl, "/tunnel/data"), cancellationToken);
-			logger.LogDebug("数据通道已连接，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
+			logger.LogInformation("数据通道已连接，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
 			await SendJsonAsync(data, new { type = "data", tunnelId = configuration.TunnelId, connectionId, token = configuration.Token }, cancellationToken);
 			using JsonDocument ready = await ReceiveJsonAsync(data, cancellationToken) ?? throw new InvalidOperationException("服务端未确认数据连接。");
 			if (!IsMessage(ready, "ready"))
 			{
 				throw new InvalidOperationException("服务端拒绝了数据连接，密钥校验失败或连接已过期。");
 			}
-			logger.LogDebug("数据通道认证成功，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
+			logger.LogInformation("数据通道认证成功，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
 			await local.ConnectAsync(configuration.LocalHost, configuration.LocalPort, cancellationToken);
-			logger.LogDebug("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, configuration.LocalHost, configuration.LocalPort);
+			logger.LogInformation("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, configuration.LocalHost, configuration.LocalPort);
 			using NetworkStream localStream = local.GetStream();
 			using var relayCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			Task upload = CopyLocalToWebSocketAsync(localStream, data, relayCancellation.Token);

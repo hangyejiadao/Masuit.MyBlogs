@@ -13,6 +13,7 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 	private const int MaxJsonMessageBytes = 16 * 1024;
 	private static readonly TimeSpan ControlHeartbeatInterval = TimeSpan.FromSeconds(15);
 	private static readonly TimeSpan ControlHeartbeatTimeout = TimeSpan.FromSeconds(10);
+	private static readonly TimeSpan[] DataConnectRetryDelays = [TimeSpan.Zero, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(750)];
 
 	public async Task RunSessionAsync(ClientConfiguration configuration, CancellationToken cancellationToken, Action<DateTimeOffset> connected)
 	{
@@ -93,18 +94,11 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		{
 			return;
 		}
-		using var data = new ClientWebSocket();
 		using var local = new TcpClient();
+		ClientWebSocket? data = null;
 		try
 		{
-			await data.ConnectAsync(BuildEndpointUri(configuration.ServerUrl, "/tunnel/data"), cancellationToken);
-			logger.LogInformation("数据通道已连接，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
-			await SendJsonAsync(data, new { type = "data", tunnelId = configuration.TunnelId, connectionId, token = configuration.Token }, cancellationToken);
-			using JsonDocument ready = await ReceiveJsonAsync(data, cancellationToken) ?? throw new InvalidOperationException("服务端未确认数据连接。");
-			if (!IsMessage(ready, "ready"))
-			{
-				throw new InvalidOperationException("服务端拒绝了数据连接，密钥校验失败或连接已过期。");
-			}
+			data = await ConnectDataSocketAsync(configuration, connectionId, cancellationToken);
 			logger.LogInformation("数据通道认证成功，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
 			await local.ConnectAsync(configuration.LocalHost, configuration.LocalPort, cancellationToken);
 			logger.LogInformation("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, configuration.LocalHost, configuration.LocalPort);
@@ -129,6 +123,49 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		{
 			logger.LogWarning(exception, "内网连接转发失败，连接={ConnectionId}", connectionId);
 		}
+		finally
+		{
+			data?.Dispose();
+		}
+	}
+
+	private async Task<ClientWebSocket> ConnectDataSocketAsync(ClientConfiguration configuration, string connectionId, CancellationToken cancellationToken)
+	{
+		Exception? lastException = null;
+		for (int attempt = 0; attempt < DataConnectRetryDelays.Length; attempt++)
+		{
+			if (DataConnectRetryDelays[attempt] > TimeSpan.Zero)
+			{
+				await Task.Delay(DataConnectRetryDelays[attempt], cancellationToken);
+			}
+
+			var data = new ClientWebSocket();
+			try
+			{
+				await data.ConnectAsync(BuildEndpointUri(configuration.ServerUrl, "/tunnel/data"), cancellationToken);
+				logger.LogInformation("数据通道已连接，隧道={TunnelId}，连接={ConnectionId}，尝试次数={Attempt}", configuration.TunnelId, connectionId, attempt + 1);
+				await SendJsonAsync(data, new { type = "data", tunnelId = configuration.TunnelId, connectionId, token = configuration.Token }, cancellationToken);
+				using JsonDocument ready = await ReceiveJsonAsync(data, cancellationToken) ?? throw new InvalidOperationException("服务端未确认数据连接。");
+				if (!IsMessage(ready, "ready"))
+				{
+					throw new InvalidOperationException("服务端拒绝了数据连接，密钥校验失败或连接已过期。");
+				}
+				return data;
+			}
+			catch (WebSocketException exception) when (!cancellationToken.IsCancellationRequested && attempt + 1 < DataConnectRetryDelays.Length)
+			{
+				lastException = exception;
+				data.Dispose();
+				logger.LogWarning("数据通道建立失败，准备重试，隧道={TunnelId}，连接={ConnectionId}，尝试次数={Attempt}，原因={Message}", configuration.TunnelId, connectionId, attempt + 1, exception.Message);
+			}
+			catch
+			{
+				data.Dispose();
+				throw;
+			}
+		}
+
+		throw new WebSocketException("数据通道建立失败，已达到重试次数。", lastException);
 	}
 
 	private static async Task CopyLocalToWebSocketAsync(NetworkStream source, ClientWebSocket destination, CancellationToken cancellationToken)

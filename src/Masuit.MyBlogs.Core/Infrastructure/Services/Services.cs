@@ -23,6 +23,8 @@ public sealed partial class ApplicationInfoService(IBaseRepository<ApplicationIn
 
 public sealed partial class AppLicenseService(IBaseRepository<AppLicense> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<AppLicense>(repository, searchEngine, searcher), IAppLicenseService;
 
+public sealed partial class LicenseAccountBindingService(IBaseRepository<LicenseAccountBinding> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<LicenseAccountBinding>(repository, searchEngine, searcher), ILicenseAccountBindingService;
+
 public sealed partial class AppPricePlanService(IBaseRepository<AppPricePlan> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<AppPricePlan>(repository, searchEngine, searcher), IAppPricePlanService;
 
 public sealed partial class AppVersionService(IBaseRepository<AppVersion> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<AppVersion>(repository, searchEngine, searcher), IAppVersionService;

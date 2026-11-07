@@ -170,3 +170,36 @@ public class LicenseVerifyCommand
 	/// </summary>
 	public string LicenseKey { get; set; }
 }
+
+/// <summary>
+/// 给授权绑定 MT5 交易账号的参数：一条授权可多次绑定不同账号
+/// </summary>
+public class LicenseBindAccountCommand
+{
+	/// <summary>
+	/// 授权id
+	/// </summary>
+	public int LicenseId { get; set; }
+
+	/// <summary>
+	/// MT5 交易账号（登录名），只允许数字
+	/// </summary>
+	public string Account { get; set; }
+}
+
+/// <summary>
+/// 按交易账号在线校验授权的参数（供被授权的软件客户端调用）：客户端上报当前 MT5 交易账号，
+/// 服务端按绑定关系找到授权并返回起止日期；应用标识可空，空时跨应用查找、取到期最晚的一条
+/// </summary>
+public class LicenseVerifyByAccountCommand
+{
+	/// <summary>
+	/// 当前 MT5 交易账号（登录名）
+	/// </summary>
+	public string Account { get; set; }
+
+	/// <summary>
+	/// 应用标识，可空；填写时只在该应用的授权中查找
+	/// </summary>
+	public string AppKey { get; set; }
+}

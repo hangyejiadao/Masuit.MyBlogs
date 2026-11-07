@@ -35,6 +35,9 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<AppLicense>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.LicenseKey).IsUnique();
         modelBuilder.Entity<AppLicense>().HasIndex(e => e.ExpireDate);
+        modelBuilder.Entity<LicenseAccountBinding>().HasOne(e => e.License).WithMany(e => e.AccountBindings).HasForeignKey(e => e.AppLicenseId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<LicenseAccountBinding>().HasIndex(e => new { e.AppLicenseId, e.Account }).IsUnique();
+        modelBuilder.Entity<LicenseAccountBinding>().HasIndex(e => e.Account);
         modelBuilder.Entity<AppOrder>().HasIndex(e => e.OrderNo).IsUnique();
         modelBuilder.Entity<AppOrder>().HasIndex(e => e.UserInfoId);
         modelBuilder.Entity<AppOrder>().HasIndex(e => e.CreatedAt).IsDescending();
@@ -179,6 +182,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<AppVersion> AppVersion { get; set; }
 
     public virtual DbSet<AppOrder> AppOrder { get; set; }
+
+    public virtual DbSet<LicenseAccountBinding> LicenseAccountBinding { get; set; }
 
     public virtual DbSet<PortForwardRule> PortForwardRule { get; set; }
 

@@ -20,6 +20,8 @@ public partial interface IApplicationInfoService : IBaseService<ApplicationInfo>
 
 public partial interface IAppLicenseService : IBaseService<AppLicense>;
 
+public partial interface ILicenseAccountBindingService : IBaseService<LicenseAccountBinding>;
+
 public partial interface IAppPricePlanService : IBaseService<AppPricePlan>;
 
 public partial interface IAppVersionService : IBaseService<AppVersion>;

@@ -72,4 +72,9 @@ public class AppLicense : BaseEntity
 	/// 最近一次到期提醒的发送时间
 	/// </summary>
 	public DateTime? LastReminderAt { get; set; }
+
+	/// <summary>
+	/// 本授权绑定的 MT5 交易账号集合：一条授权可绑定多个交易账号，被授权软件凭账号校验本授权
+	/// </summary>
+	public virtual ICollection<LicenseAccountBinding> AccountBindings { get; set; }
 }

@@ -47,6 +47,11 @@ public IAppVersionService AppVersionService { get; set;}
 public IAppOrderService AppOrderService { get; set;}
 
 /// <summary>
+/// 授权与 MT5 交易账号绑定服务
+/// </summary>
+public ILicenseAccountBindingService LicenseAccountBindingService { get; set;}
+
+/// <summary>
 /// 授权管理首页：全部授权按到期时间排序
 /// </summary>
 /// <returns></returns>
@@ -139,7 +144,8 @@ l.PaidPrice,
 l.LicenseKey,
 l.StartDate,
 l.ExpireDate,
-l.Remark
+l.Remark,
+Accounts = l.AccountBindings.OrderBy(b => b.Id).Select(b => b.Account)
 }).ToList();
 return ResultData(new { Total = total, Items = items });
 }
@@ -520,6 +526,73 @@ return ResultData(null, true, $"提醒邮件已发送到 {email}");
 }
 
 /// <summary>
+/// 某条授权已绑定的 MT5 交易账号列表（供后台绑定管理弹窗使用）
+/// </summary>
+/// <param name="licenseId"></param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult AccountList(int licenseId)
+{
+var items = LicenseAccountBindingService.GetQuery(b => b.AppLicenseId == licenseId).OrderBy(b => b.Id).Select(b => new
+{
+b.Id,
+b.Account
+}).ToList();
+return ResultData(new { Items = items });
+}
+
+/// <summary>
+/// 给授权绑定一个 MT5 交易账号：一条授权可绑定多个账号，同一授权下账号不能重复；
+/// 同一账号可以绑到不同应用（或同应用不同授权），按账号校验时取到期最晚的一条有效授权
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost, MyAuthorize]
+public IActionResult BindAccount([FromBodyOrDefault] LicenseBindAccountCommand cmd)
+{
+if (cmd == null || cmd.LicenseId <= 0 || string.IsNullOrWhiteSpace(cmd.Account))
+{
+return ResultData(null, false, "请选择授权并填写交易账号！");
+}
+
+var account = cmd.Account.Trim();
+if (account.Length < 4 || account.Length > 20 || !account.All(char.IsDigit))
+{
+return ResultData(null, false, "交易账号应为 4–20 位数字！");
+}
+
+if (!AppLicenseService.Any(l => l.Id == cmd.LicenseId))
+{
+return ResultData(null, false, "授权不存在！");
+}
+
+if (LicenseAccountBindingService.Any(b => b.AppLicenseId == cmd.LicenseId && b.Account == account))
+{
+return ResultData(null, false, "该授权已绑定此交易账号！");
+}
+
+var added = LicenseAccountBindingService.AddEntitySaved(new LicenseAccountBinding
+{
+AppLicenseId = cmd.LicenseId,
+Account = account,
+Status = Status.Available
+});
+return ResultData(null, added!= null, added!= null? "交易账号已绑定": "绑定失败");
+}
+
+/// <summary>
+/// 解绑一条授权与交易账号的绑定（参数 Id 为绑定记录id）
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost, MyAuthorize]
+public IActionResult UnbindAccount([FromBodyOrDefault] LicenseIdCommand cmd)
+{
+var b = LicenseAccountBindingService.DeleteById(cmd.Id);
+return ResultData(null, b, b? "已解绑！": "解绑失败！");
+}
+
+/// <summary>
 /// 授权在线校验（供被授权的软件客户端调用，无需登录，授权码本身即凭证）：
 /// 凭授权码返回所属应用名称、应用标识与授权起止日期；授权码不存在或已停用时返回失败，
 /// 已过期的授权仍返回成功并带数据，由调用方按到期日自行判断
@@ -550,6 +623,49 @@ return ResultData(new
 {
 ApplicationName = license.Application == null? null: license.Application.Name,
 AppKey = license.Application == null? null: license.Application.AppKey,
+license.StartDate,
+license.ExpireDate
+}, true, expired? "授权已过期": "授权有效");
+}
+
+/// <summary>
+/// 按 MT5 交易账号在线校验授权（供被授权的软件客户端调用，无需登录）：
+/// 客户端上报当前交易账号，服务端按绑定关系查找该账号名下未停用的授权，取到期最晚的一条，
+/// 返回所属应用名称、应用标识与授权起止日期；账号未绑定任何有效授权时返回失败，
+/// 已过期的授权仍返回成功并带数据，由调用方按到期日自行判断（含过期后的免费期等策略都在调用方）
+/// </summary>
+/// <param name="cmd"></param>
+/// <returns></returns>
+[HttpPost, AllowAnonymous, AllowAccessFirewall]
+public IActionResult VerifyByAccount([FromBodyOrDefault] LicenseVerifyByAccountCommand cmd)
+{
+if (cmd == null || string.IsNullOrWhiteSpace(cmd.Account))
+{
+return ResultData(null, false, "交易账号不能为空");
+}
+
+var account = cmd.Account.Trim();
+var query = LicenseAccountBindingService.GetQuery(b => b.Account == account)
+.Include(b => b.License).ThenInclude(l => l.Application)
+.Where(b => b.License.Status == Status.Available);
+if (!string.IsNullOrWhiteSpace(cmd.AppKey))
+{
+var appKey = cmd.AppKey.Trim();
+query = query.Where(b => b.License.Application.AppKey == appKey);
+}
+
+var license = query.Select(b => b.License).OrderByDescending(l => l.ExpireDate).FirstOrDefault();
+if (license == null)
+{
+return ResultData(null, false, "该交易账号未绑定有效授权");
+}
+
+var expired = license.ExpireDate.Date < DateTime.Today;
+return ResultData(new
+{
+ApplicationName = license.Application == null? null: license.Application.Name,
+AppKey = license.Application == null? null: license.Application.AppKey,
+Account = account,
 license.StartDate,
 license.ExpireDate
 }, true, expired? "授权已过期": "授权有效");

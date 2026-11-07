@@ -27,6 +27,7 @@
           <th class="text-left">用户</th>
           <th class="text-left">提醒邮箱</th>
           <th class="text-left">授权码</th>
+          <th class="text-left">绑定交易账号</th>
           <th class="text-left">方案 / 价格</th>
           <th class="text-left">生效日期</th>
           <th class="text-left">到期日期</th>
@@ -41,6 +42,10 @@
           <td class="text-left">{{ row.UserEmail || '-' }}</td>
           <td class="text-left">{{ row.LicenseKey }}</td>
           <td class="text-left">
+            <q-chip v-for="acc in row.Accounts ?? []" :key="acc" dense size="sm" color="blue-grey" text-color="white">{{ acc }}</q-chip>
+            <span v-if="!row.Accounts || row.Accounts.length === 0" class="text-grey">未绑定</span>
+          </td>
+          <td class="text-left">
             <div>{{ row.PlanName || '手工签发' }}</div>
             <div v-if="row.PaidPrice != null" class="text-grey">¥{{ row.PaidPrice }}</div>
           </td>
@@ -51,13 +56,14 @@
           </td>
           <td class="text-center">
             <q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" />
+            <q-btn flat dense size="sm" color="purple" label="账号绑定" @click="openBind(row)" />
             <q-btn flat dense size="sm" color="teal" label="续期" @click="openRenew(row)" />
             <q-btn flat dense size="sm" color="orange" label="发提醒" @click="askRemind(row)" />
             <q-btn flat dense size="sm" color="negative" label="删除" @click="askDelete(row)" />
           </td>
         </tr>
         <tr v-if="!loading && rows.length === 0">
-          <td colspan="9" class="text-center text-grey">暂无数据</td>
+          <td colspan="10" class="text-center text-grey">暂无数据</td>
         </tr>
       </tbody>
     </q-markup-table>
@@ -121,6 +127,29 @@
     </q-card>
   </q-dialog>
 
+  <q-dialog v-model="showBind" persistent>
+    <q-card style="min-width: 420px">
+      <q-card-section>
+        <div class="text-h6">绑定 MT5 交易账号</div>
+      </q-card-section>
+      <q-card-section class="q-gutter-md">
+        <div>应用「{{ bindTarget?.ApplicationName }}」/ 用户「{{ bindTarget ? (bindTarget.UserNickName || bindTarget.UserName) : '' }}」——被授权软件将按交易账号校验本授权，一条授权可绑定多个账号。</div>
+        <div v-if="bindAccounts.length === 0" class="text-grey">尚未绑定任何交易账号</div>
+        <div v-for="b in bindAccounts" :key="b.Id" class="row items-center justify-between">
+          <q-chip dense color="blue-grey" text-color="white">{{ b.Account }}</q-chip>
+          <q-btn flat dense size="sm" color="negative" label="解绑" @click="doUnbind(b)" />
+        </div>
+        <div class="row items-center q-gutter-sm">
+          <q-input v-model="newAccount" outlined dense label="MT5 交易账号（数字）" class="col" @keyup.enter="doBind" />
+          <q-btn color="purple" label="绑定" :loading="submitting" @click="doBind" />
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="关闭" @click="showBind = false" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
   <q-dialog v-model="showDelete" persistent>
     <q-card style="min-width: 320px">
       <q-card-section>
@@ -157,6 +186,12 @@ interface LicenseRow {
   StartDate: string
   ExpireDate: string
   Remark?: string
+  Accounts?: string[]
+}
+
+interface AccountBinding {
+  Id: number
+  Account: string
 }
 
 interface PlanOption {
@@ -193,6 +228,10 @@ const selectedPlan = computed(() => allPlans.value.find(p => p.Id === form.value
 const showRenew = ref(false)
 const renewTarget = ref<LicenseRow | null>(null)
 const renewMonths = ref(12)
+const showBind = ref(false)
+const bindTarget = ref<LicenseRow | null>(null)
+const bindAccounts = ref<AccountBinding[]>([])
+const newAccount = ref('')
 const showRemind = ref(false)
 const remindTarget = ref<LicenseRow | null>(null)
 const showDelete = ref(false)
@@ -319,6 +358,55 @@ const doRenew = async () => {
     if (res.Success) {
       toast.success(res.Message || '续期成功')
       showRenew.value = false
+      load()
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+const loadBindAccounts = async () => {
+  if (!bindTarget.value) return
+  const res = await api.get('/License/AccountList', { params: { licenseId: bindTarget.value.Id } }) as ApiResponse
+  bindAccounts.value = res.Data?.Items ?? []
+}
+
+const openBind = async (row: LicenseRow) => {
+  bindTarget.value = row
+  newAccount.value = ''
+  bindAccounts.value = []
+  showBind.value = true
+  await loadBindAccounts()
+}
+
+const doBind = async () => {
+  if (!bindTarget.value) return
+  const account = newAccount.value.trim()
+  if (!account) {
+    toast.error('请填写交易账号')
+    return
+  }
+  submitting.value = true
+  try {
+    const res = await api.post('/License/BindAccount', { LicenseId: bindTarget.value.Id, Account: account }) as ApiResponse
+    if (res.Success) {
+      toast.success(res.Message || '绑定成功')
+      newAccount.value = ''
+      await loadBindAccounts()
+      load()
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+const doUnbind = async (binding: AccountBinding) => {
+  submitting.value = true
+  try {
+    const res = await api.post('/License/UnbindAccount', { Id: binding.Id }) as ApiResponse
+    if (res.Success) {
+      toast.success(res.Message || '已解绑')
+      await loadBindAccounts()
       load()
     }
   } finally {

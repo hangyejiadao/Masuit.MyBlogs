@@ -1,4 +1,5 @@
 using Masuit.ReverseTunnel.Client;
+using Microsoft.Data.Sqlite;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,38 +13,110 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.MapGet("/api/config", (ClientStore store) => Results.Ok(store.LoadForWeb()));
-app.MapGet("/api/status", (TunnelClientService service) => Results.Ok(service.GetStatus()));
-app.MapPut("/api/config", (ClientConfiguration configuration, ClientStore store, TunnelClientService service) =>
+app.MapGet("/api/config", (ClientStore store) => Results.Ok(store.LoadAll().Select(ToWebConfiguration)));
+app.MapGet("/api/config/{id:long}", (long id, ClientStore store) =>
 {
-	ClientConfiguration current = store.Load();
-	configuration = configuration with { Token = string.IsNullOrWhiteSpace(configuration.Token) ? current.Token : configuration.Token };
-	var validationError = configuration.Validate();
+	ClientConfiguration? configuration = store.Load(id);
+	return configuration is null ? Results.NotFound(new { message = "隧道配置不存在。" }) : Results.Ok(ToWebConfiguration(configuration));
+});
+app.MapGet("/api/status", (TunnelClientService service) => Results.Ok(service.GetStatuses()));
+
+app.MapPost("/api/config", (ClientConfigurationRequest request, ClientStore store, TunnelClientService service) =>
+	SaveConfiguration(0, request, store, service));
+app.MapPut("/api/config/{id:long}", (long id, ClientConfigurationRequest request, ClientStore store, TunnelClientService service) =>
+	SaveConfiguration(id, request, store, service));
+
+app.MapPost("/api/config/{id:long}/connect", (long id, ClientStore store, TunnelClientService service) =>
+{
+	ClientConfiguration? configuration = store.Load(id);
+	if (configuration is null)
+	{
+		return Results.NotFound(new { message = "隧道配置不存在。" });
+	}
+	string? validationError = configuration.Validate();
 	if (validationError is not null)
 	{
 		return Results.BadRequest(new { message = validationError });
 	}
-	store.Save(configuration with { Enabled = false });
-	service.Reload();
-	return Results.Ok(store.LoadForWeb());
+	store.SetEnabled(id, true);
+	service.Reload(id);
+	return Results.Ok(ToWebConfiguration(store.Load(id)!));
 });
-app.MapPost("/api/connect", (ClientStore store, TunnelClientService service) =>
+
+app.MapPost("/api/config/{id:long}/disconnect", (long id, ClientStore store, TunnelClientService service) =>
 {
-	var configuration = store.Load();
-	var validationError = configuration.Validate();
-	if (validationError is not null)
+	if (!store.SetEnabled(id, false))
 	{
-		return Results.BadRequest(new { message = validationError });
+		return Results.NotFound(new { message = "隧道配置不存在。" });
 	}
-	store.Save(configuration with { Enabled = true });
-	service.Reload();
-	return Results.Ok(store.LoadForWeb());
+	service.Reload(id);
+	return Results.Ok(ToWebConfiguration(store.Load(id)!));
 });
-app.MapPost("/api/disconnect", (ClientStore store, TunnelClientService service) =>
+
+app.MapDelete("/api/config/{id:long}", (long id, ClientStore store, TunnelClientService service) =>
 {
-	store.Save(store.Load() with { Enabled = false });
-	service.Reload();
-	return Results.Ok(store.LoadForWeb());
+	if (!store.Delete(id))
+	{
+		return Results.NotFound(new { message = "隧道配置不存在。" });
+	}
+	service.Forget(id);
+	return Results.Ok(new { deleted = true });
 });
 
 app.Run();
+
+static IResult SaveConfiguration(long id, ClientConfigurationRequest request, ClientStore store, TunnelClientService service)
+{
+	ClientConfiguration? current = id > 0 ? store.Load(id) : null;
+	if (id > 0 && current is null)
+	{
+		return Results.NotFound(new { message = "隧道配置不存在。" });
+	}
+
+	string token = string.IsNullOrWhiteSpace(request.Token) ? current?.Token ?? string.Empty : request.Token.Trim();
+	var configuration = new ClientConfiguration(
+		id,
+		request.Name?.Trim() ?? string.Empty,
+		request.ServerUrl?.Trim() ?? string.Empty,
+		request.TunnelId?.Trim() ?? string.Empty,
+		token,
+		request.LocalHost?.Trim() ?? string.Empty,
+		request.LocalPort,
+		request.Enabled);
+	string? validationError = configuration.Validate();
+	if (validationError is not null)
+	{
+		return Results.BadRequest(new { message = validationError });
+	}
+	if (store.HasDuplicate(configuration.ServerUrl, configuration.TunnelId, id))
+	{
+		return Results.Conflict(new { message = "相同服务端地址和隧道编号的配置已经存在。" });
+	}
+
+	ClientConfiguration saved;
+	try
+	{
+		saved = store.Save(configuration);
+	}
+	catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+	{
+		return Results.Conflict(new { message = "相同服务端地址和隧道编号的配置已经存在。" });
+	}
+	service.Reload(saved.Id);
+	return Results.Ok(ToWebConfiguration(saved));
+}
+
+static object ToWebConfiguration(ClientConfiguration configuration)
+{
+	return new
+	{
+		configuration.Id,
+		configuration.Name,
+		configuration.ServerUrl,
+		configuration.TunnelId,
+		TokenConfigured = !string.IsNullOrWhiteSpace(configuration.Token),
+		configuration.LocalHost,
+		configuration.LocalPort,
+		configuration.Enabled
+	};
+}

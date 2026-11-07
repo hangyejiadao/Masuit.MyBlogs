@@ -7,65 +7,117 @@
   <style>
     :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { margin: 0; background: #f4f6f8; color: #1f2937; }
-    main { max-width: 760px; margin: 32px auto; padding: 0 18px; }
+    main { max-width: 1080px; margin: 28px auto; padding: 0 18px; }
     section { background: #fff; border: 1px solid #d9dee5; border-radius: 8px; padding: 22px; box-shadow: 0 2px 8px #1f293710; }
-    h1 { margin: 0 0 20px; font-size: 24px; }
+    h1 { margin: 0; font-size: 24px; }
+    h2 { margin: 0 0 16px; font-size: 18px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     label { display: grid; gap: 6px; font-size: 14px; color: #4b5563; }
     label.full { grid-column: 1 / -1; }
     input { box-sizing: border-box; width: 100%; border: 1px solid #cbd5e1; border-radius: 5px; padding: 10px; font: inherit; }
-    .actions { display: flex; gap: 10px; margin-top: 20px; }
-    button { border: 0; border-radius: 5px; padding: 10px 16px; cursor: pointer; font: inherit; }
-    #save { background: #2563eb; color: #fff; } #connect { background: #16a34a; color: #fff; } #disconnect { background: #6b7280; color: #fff; }
+    input:focus { outline: 2px solid #bfdbfe; border-color: #2563eb; }
+    .check { display: flex; align-items: center; gap: 8px; color: #374151; }
+    .check input { width: auto; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    button { border: 0; border-radius: 5px; padding: 9px 13px; cursor: pointer; font: inherit; }
     button:disabled { opacity: .55; cursor: wait; }
-    .status { margin-top: 18px; padding: 12px; background: #f8fafc; border-left: 4px solid #94a3b8; white-space: pre-wrap; }
-    .hint { margin: 16px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
-    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } label.full { grid-column: auto; } }
+    .primary { background: #2563eb; color: #fff; } .success { background: #16a34a; color: #fff; }
+    .muted { background: #e5e7eb; color: #374151; } .danger { background: #dc2626; color: #fff; }
+    .outline { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
+    .status { margin-top: 16px; padding: 11px 13px; background: #f8fafc; border-left: 4px solid #94a3b8; white-space: pre-wrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 850px; }
+    th, td { padding: 11px 9px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+    th { color: #4b5563; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    td { font-size: 14px; }
+    .nowrap { white-space: nowrap; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: #e5e7eb; color: #374151; }
+    .pill.connected { background: #dcfce7; color: #166534; } .pill.connecting { background: #dbeafe; color: #1d4ed8; }
+    .pill.reconnecting { background: #fef3c7; color: #92400e; } .pill.faulted { background: #fee2e2; color: #991b1b; }
+    .empty { padding: 28px; text-align: center; color: #64748b; }
+    .hint { margin: 14px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+    .editor { margin-bottom: 22px; }
+    .hidden { display: none; }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } label.full { grid-column: auto; } .section-head { align-items: flex-start; flex-direction: column; } }
   </style>
 </head>
 <body>
 <main>
-  <section>
+  <div class="section-head">
     <h1>内网穿透客户端</h1>
+    <button id="newConfig" class="primary">新增隧道</button>
+  </div>
+
+  <section id="editor" class="editor hidden">
+    <h2 id="editorTitle">新增隧道</h2>
     <div class="grid">
-      <label class="full">服务端地址
-        <input id="serverUrl" placeholder="https://example.com">
+      <label>配置名称
+        <input id="name" placeholder="例如：办公 SSH">
       </label>
       <label>隧道编号
         <input id="tunnelId" placeholder="office-pc">
       </label>
+      <label class="full">服务端地址
+        <input id="serverUrl" placeholder="https://example.com">
+      </label>
       <label>服务端密钥
-        <input id="token" type="password" autocomplete="off" placeholder="至少 16 个字符">
+        <input id="token" type="password" autocomplete="off" placeholder="新增时必填，编辑时留空表示沿用">
       </label>
       <label>本地目标主机
-        <input id="localHost" value="127.0.0.1">
+        <input id="localHost" value="host.docker.internal">
       </label>
       <label>本地目标端口
-        <input id="localPort" type="number" min="1" max="65535" value="80">
+        <input id="localPort" type="number" min="1" max="65535" value="22">
       </label>
+      <label class="check"><input id="enabled" type="checkbox"> 保存后启用连接</label>
     </div>
     <div class="actions">
-      <button id="save">保存配置</button>
-      <button id="connect">连接</button>
-      <button id="disconnect">断开</button>
+      <button id="save" class="primary">保存</button>
+      <button id="cancel" class="muted">取消</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>隧道列表</h2>
+      <button id="refresh" class="outline">刷新</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>名称</th><th>服务端</th><th>隧道编号</th><th>本地目标</th><th>启用</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="7" class="empty">正在读取配置...</td></tr></tbody>
+      </table>
     </div>
     <div id="status" class="status">正在读取状态...</div>
-    <p class="hint">配置保存到客户端容器的 SQLite 数据库。请挂载 <code>/data</code>，并限制此管理页面只允许可信网络访问。</p>
+    <p class="hint">配置保存在客户端容器挂载的 SQLite `/data/client.db` 中。列表不会返回明文密钥；管理页面只应暴露给可信网络。</p>
   </section>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const fields = ['serverUrl', 'tunnelId', 'token', 'localHost', 'localPort'];
-function readForm() { return { ServerUrl: $('serverUrl').value, TunnelId: $('tunnelId').value, Token: $('token').value, LocalHost: $('localHost').value, LocalPort: Number($('localPort').value), Enabled: false }; }
+let configs = [];
+let statuses = new Map();
+let editingId = 0;
+
 function show(message) { $('status').textContent = message; }
-function fill(data) { for (const field of fields) { const key = field[0].toUpperCase() + field.slice(1); if (data[key] !== undefined) $(field).value = data[key]; } }
-async function request(url, options) { const response = await fetch(url, { headers: {'Content-Type': 'application/json'}, ...options }); const data = await response.json(); if (!response.ok) throw new Error(data.message || '请求失败'); return data; }
-async function loadConfig() { try { fill(await request('/api/config')); await refreshStatus(); } catch (error) { show(error.message); } }
-async function save() { try { await request('/api/config', { method: 'PUT', body: JSON.stringify(readForm()) }); show('配置已保存，当前未连接。'); await refreshStatus(); } catch (error) { show(error.message); } }
-async function connect() { try { await request('/api/config', { method: 'PUT', body: JSON.stringify(readForm()) }); await request('/api/connect', { method: 'POST' }); show('正在连接服务端...'); await refreshStatus(); } catch (error) { show(error.message); } }
-async function disconnect() { try { await request('/api/disconnect', { method: 'POST' }); show('已断开连接。'); await refreshStatus(); } catch (error) { show(error.message); } }
-async function refreshStatus() { try { const data = await request('/api/status'); show(`状态：${data.state}\n${data.lastError ? '错误：' + data.lastError : ''}${data.connectedAt ? '\n连接时间：' + data.connectedAt : ''}`); } catch (error) { show(error.message); } }
-$('save').onclick = save; $('connect').onclick = connect; $('disconnect').onclick = disconnect; loadConfig(); setInterval(refreshStatus, 5000);
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character])); }
+function stateLabel(state) { return ({ Connected: '已连接', Connecting: '连接中', Reconnecting: '重连中', Faulted: '故障', Stopped: '已断开' }[state] || state || '未启动'); }
+function stateClass(state) { return String(state || '').toLowerCase(); }
+function readForm() { return { Name: $('name').value, ServerUrl: $('serverUrl').value, TunnelId: $('tunnelId').value, Token: $('token').value, LocalHost: $('localHost').value, LocalPort: Number($('localPort').value), Enabled: $('enabled').checked }; }
+function resetForm() { editingId = 0; $('editorTitle').textContent = '新增隧道'; $('name').value = ''; $('serverUrl').value = ''; $('tunnelId').value = ''; $('token').value = ''; $('localHost').value = 'host.docker.internal'; $('localPort').value = 22; $('enabled').checked = false; }
+function openEditor(config) { editingId = config?.id || 0; $('editorTitle').textContent = editingId ? '编辑隧道' : '新增隧道'; $('name').value = config?.name || ''; $('serverUrl').value = config?.serverUrl || ''; $('tunnelId').value = config?.tunnelId || ''; $('token').value = ''; $('localHost').value = config?.localHost || 'host.docker.internal'; $('localPort').value = config?.localPort || 22; $('enabled').checked = Boolean(config?.enabled); $('editor').classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function closeEditor() { $('editor').classList.add('hidden'); resetForm(); }
+async function request(url, options = {}) { const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }); const data = await response.json(); if (!response.ok) throw new Error(data.message || '请求失败'); return data; }
+async function load() { try { const [configData, statusData] = await Promise.all([request('/api/config'), request('/api/status')]); configs = configData; statuses = new Map(statusData.map(item => [item.id, item])); render(); show(`已加载 ${configs.length} 条隧道配置。`); } catch (error) { show(error.message); } }
+function render() { if (!configs.length) { $('rows').innerHTML = '<tr><td colspan="7" class="empty">暂无隧道配置，点击“新增隧道”开始。</td></tr>'; return; } $('rows').innerHTML = configs.map(config => { const status = statuses.get(config.id) || { state: 'Stopped' }; const state = status.state || 'Stopped'; const action = config.enabled ? `<button class="muted" data-action="disconnect" data-id="${config.id}">断开</button>` : `<button class="success" data-action="connect" data-id="${config.id}">连接</button>`; return `<tr><td><strong>${escapeHtml(config.name)}</strong></td><td>${escapeHtml(config.serverUrl)}</td><td class="nowrap">${escapeHtml(config.tunnelId)}</td><td class="nowrap">${escapeHtml(config.localHost)}:${config.localPort}</td><td>${config.enabled ? '是' : '否'}</td><td><span class="pill ${stateClass(state)}">${stateLabel(state)}</span>${status.lastError ? `<br><small>${escapeHtml(status.lastError)}</small>` : ''}</td><td class="nowrap"><div class="actions">${action}<button class="outline" data-action="edit" data-id="${config.id}">编辑</button><button class="danger" data-action="delete" data-id="${config.id}">删除</button></div></td></tr>`; }).join(''); }
+async function save() { try { const body = readForm(); const url = editingId ? `/api/config/${editingId}` : '/api/config'; await request(url, { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }); closeEditor(); await load(); show('配置已保存。'); } catch (error) { show(error.message); } }
+async function edit(id) { try { const config = await request(`/api/config/${id}`); openEditor(config); } catch (error) { show(error.message); } }
+async function toggle(id, action) { try { await request(`/api/config/${id}/${action}`, { method: 'POST' }); await load(); show(action === 'connect' ? '正在连接服务端...' : '已断开连接。'); } catch (error) { show(error.message); } }
+async function remove(id) { if (!window.confirm('确定删除这条隧道配置吗？')) return; try { await request(`/api/config/${id}`, { method: 'DELETE' }); await load(); show('隧道配置已删除。'); } catch (error) { show(error.message); } }
+$('newConfig').onclick = () => { resetForm(); $('editor').classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+$('cancel').onclick = closeEditor; $('save').onclick = save; $('refresh').onclick = load;
+$('rows').onclick = event => { const button = event.target.closest('button[data-action]'); if (!button) return; const id = Number(button.dataset.id); const action = button.dataset.action; if (action === 'edit') edit(id); if (action === 'connect' || action === 'disconnect') toggle(id, action); if (action === 'delete') remove(id); };
+load(); setInterval(async () => { try { const data = await request('/api/status'); statuses = new Map(data.map(item => [item.id, item])); render(); } catch (_) {} }, 3000);
 </script>
 </body>
 </html>

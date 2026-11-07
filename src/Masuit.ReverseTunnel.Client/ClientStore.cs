@@ -2,9 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Masuit.ReverseTunnel.Client;
 
-/// <summary>
-/// 使用本地 SQLite 保存客户端配置。数据库目录通过 ReverseTunnelClient__DataDirectory 配置，默认是 /data。
-/// </summary>
+/// <summary>使用本地 SQLite 保存多条内网隧道配置。</summary>
 public sealed class ClientStore
 {
 	private readonly string _connectionString;
@@ -24,38 +22,54 @@ public sealed class ClientStore
 		Initialize();
 	}
 
-	public ClientConfiguration Load()
+	public IReadOnlyList<ClientConfiguration> LoadAll()
 	{
 		lock (_gate)
 		{
 			using var connection = OpenConnection();
 			using var command = connection.CreateCommand();
-			command.CommandText = "SELECT ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled FROM ClientConfiguration WHERE Id = 1";
+			command.CommandText = "SELECT Id, Name, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled FROM TunnelConfigurations ORDER BY Id";
 			using SqliteDataReader reader = command.ExecuteReader();
-			if (!reader.Read())
+			var configurations = new List<ClientConfiguration>();
+			while (reader.Read())
 			{
-				return ClientConfiguration.Empty;
+				configurations.Add(ReadConfiguration(reader));
 			}
-			return new ClientConfiguration(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4), reader.GetBoolean(5));
+			return configurations;
 		}
 	}
 
-	public ClientConfiguration LoadForWeb()
-	{
-		return Load() with { Token = "" };
-	}
-
-	public void Save(ClientConfiguration configuration)
+	public ClientConfiguration? Load(long id)
 	{
 		lock (_gate)
 		{
 			using var connection = OpenConnection();
 			using var command = connection.CreateCommand();
-			command.CommandText = """
-				INSERT INTO ClientConfiguration (Id, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled, UpdatedAt)
-				VALUES (1, $serverUrl, $tunnelId, $token, $localHost, $localPort, $enabled, $updatedAt)
-				ON CONFLICT(Id) DO UPDATE SET ServerUrl = excluded.ServerUrl, TunnelId = excluded.TunnelId, Token = excluded.Token, LocalHost = excluded.LocalHost, LocalPort = excluded.LocalPort, Enabled = excluded.Enabled, UpdatedAt = excluded.UpdatedAt;
-				""";
+			command.CommandText = "SELECT Id, Name, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled FROM TunnelConfigurations WHERE Id = $id";
+			command.Parameters.AddWithValue("$id", id);
+			using SqliteDataReader reader = command.ExecuteReader();
+			return reader.Read() ? ReadConfiguration(reader) : null;
+		}
+	}
+
+	public ClientConfiguration Save(ClientConfiguration configuration)
+	{
+		lock (_gate)
+		{
+			using var connection = OpenConnection();
+			using var command = connection.CreateCommand();
+			command.CommandText = configuration.Id > 0
+				? """
+					UPDATE TunnelConfigurations
+					SET Name = $name, ServerUrl = $serverUrl, TunnelId = $tunnelId, Token = $token, LocalHost = $localHost, LocalPort = $localPort, Enabled = $enabled, UpdatedAt = $updatedAt
+					WHERE Id = $id;
+					"""
+				: """
+					INSERT INTO TunnelConfigurations (Name, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled, UpdatedAt)
+					VALUES ($name, $serverUrl, $tunnelId, $token, $localHost, $localPort, $enabled, $updatedAt);
+					""";
+			command.Parameters.AddWithValue("$id", configuration.Id);
+			command.Parameters.AddWithValue("$name", configuration.Name.Trim());
 			command.Parameters.AddWithValue("$serverUrl", configuration.ServerUrl.Trim());
 			command.Parameters.AddWithValue("$tunnelId", configuration.TunnelId.Trim());
 			command.Parameters.AddWithValue("$token", configuration.Token.Trim());
@@ -64,6 +78,55 @@ public sealed class ClientStore
 			command.Parameters.AddWithValue("$enabled", configuration.Enabled);
 			command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
 			command.ExecuteNonQuery();
+
+			if (configuration.Id > 0)
+			{
+				return Load(configuration.Id) ?? throw new InvalidOperationException("保存隧道配置后无法读取记录。");
+			}
+			using var idCommand = connection.CreateCommand();
+			idCommand.CommandText = "SELECT last_insert_rowid()";
+			long id = Convert.ToInt64(idCommand.ExecuteScalar());
+			return Load(id) ?? throw new InvalidOperationException("创建隧道配置后无法读取记录。");
+		}
+	}
+
+	public bool Delete(long id)
+	{
+		lock (_gate)
+		{
+			using var connection = OpenConnection();
+			using var command = connection.CreateCommand();
+			command.CommandText = "DELETE FROM TunnelConfigurations WHERE Id = $id";
+			command.Parameters.AddWithValue("$id", id);
+			return command.ExecuteNonQuery() > 0;
+		}
+	}
+
+	public bool SetEnabled(long id, bool enabled)
+	{
+		lock (_gate)
+		{
+			using var connection = OpenConnection();
+			using var command = connection.CreateCommand();
+			command.CommandText = "UPDATE TunnelConfigurations SET Enabled = $enabled, UpdatedAt = $updatedAt WHERE Id = $id";
+			command.Parameters.AddWithValue("$id", id);
+			command.Parameters.AddWithValue("$enabled", enabled);
+			command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+			return command.ExecuteNonQuery() > 0;
+		}
+	}
+
+	public bool HasDuplicate(string serverUrl, string tunnelId, long exceptId = 0)
+	{
+		lock (_gate)
+		{
+			using var connection = OpenConnection();
+			using var command = connection.CreateCommand();
+			command.CommandText = "SELECT 1 FROM TunnelConfigurations WHERE lower(ServerUrl) = lower($serverUrl) AND lower(TunnelId) = lower($tunnelId) AND Id <> $exceptId LIMIT 1";
+			command.Parameters.AddWithValue("$serverUrl", serverUrl.Trim());
+			command.Parameters.AddWithValue("$tunnelId", tunnelId.Trim());
+			command.Parameters.AddWithValue("$exceptId", exceptId);
+			return command.ExecuteScalar() is not null;
 		}
 	}
 
@@ -74,12 +137,49 @@ public sealed class ClientStore
 			using var connection = OpenConnection();
 			using var command = connection.CreateCommand();
 			command.CommandText = """
-				CREATE TABLE IF NOT EXISTS ClientConfiguration (
-					Id INTEGER PRIMARY KEY CHECK (Id = 1), ServerUrl TEXT NOT NULL DEFAULT '', TunnelId TEXT NOT NULL DEFAULT '', Token TEXT NOT NULL DEFAULT '', LocalHost TEXT NOT NULL DEFAULT '127.0.0.1', LocalPort INTEGER NOT NULL DEFAULT 80, Enabled INTEGER NOT NULL DEFAULT 0, UpdatedAt TEXT NOT NULL
+				CREATE TABLE IF NOT EXISTS TunnelConfigurations (
+					Id INTEGER PRIMARY KEY AUTOINCREMENT,
+					Name TEXT NOT NULL DEFAULT '',
+					ServerUrl TEXT NOT NULL DEFAULT '',
+					TunnelId TEXT NOT NULL DEFAULT '',
+					Token TEXT NOT NULL DEFAULT '',
+					LocalHost TEXT NOT NULL DEFAULT '127.0.0.1',
+					LocalPort INTEGER NOT NULL DEFAULT 80,
+					Enabled INTEGER NOT NULL DEFAULT 0,
+					UpdatedAt TEXT NOT NULL
 				);
+				CREATE UNIQUE INDEX IF NOT EXISTS IX_TunnelConfigurations_ServerUrl_TunnelId
+					ON TunnelConfigurations (ServerUrl COLLATE NOCASE, TunnelId COLLATE NOCASE);
+				CREATE TABLE IF NOT EXISTS ClientConfiguration (
+					Id INTEGER PRIMARY KEY CHECK (Id = 1),
+					ServerUrl TEXT NOT NULL DEFAULT '',
+					TunnelId TEXT NOT NULL DEFAULT '',
+					Token TEXT NOT NULL DEFAULT '',
+					LocalHost TEXT NOT NULL DEFAULT '127.0.0.1',
+					LocalPort INTEGER NOT NULL DEFAULT 80,
+					Enabled INTEGER NOT NULL DEFAULT 0,
+					UpdatedAt TEXT NOT NULL
+				);
+				INSERT INTO TunnelConfigurations (Name, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled, UpdatedAt)
+				SELECT CASE WHEN trim(TunnelId) = '' THEN '默认隧道' ELSE trim(TunnelId) END, ServerUrl, TunnelId, Token, LocalHost, LocalPort, Enabled, UpdatedAt
+				FROM ClientConfiguration
+				WHERE Id = 1 AND NOT EXISTS (SELECT 1 FROM TunnelConfigurations);
 				""";
 			command.ExecuteNonQuery();
 		}
+	}
+
+	private static ClientConfiguration ReadConfiguration(SqliteDataReader reader)
+	{
+		return new ClientConfiguration(
+			reader.GetInt64(0),
+			reader.GetString(1),
+			reader.GetString(2),
+			reader.GetString(3),
+			reader.GetString(4),
+			reader.GetString(5),
+			reader.GetInt32(6),
+			reader.GetBoolean(7));
 	}
 
 	private SqliteConnection OpenConnection()
@@ -91,12 +191,16 @@ public sealed class ClientStore
 }
 
 /// <summary>内网穿透客户端的持久化配置。</summary>
-public sealed record ClientConfiguration(string ServerUrl, string TunnelId, string Token, string LocalHost, int LocalPort, bool Enabled)
+public sealed record ClientConfiguration(long Id, string Name, string ServerUrl, string TunnelId, string Token, string LocalHost, int LocalPort, bool Enabled)
 {
-	public static ClientConfiguration Empty { get; } = new("", "", "", "127.0.0.1", 80, false);
+	public static ClientConfiguration Empty { get; } = new(0, "", "", "", "", "127.0.0.1", 80, false);
 
 	public string? Validate()
 	{
+		if (string.IsNullOrWhiteSpace(Name) || Name.Trim().Length > 128)
+		{
+			return "隧道名称不能为空且不能超过 128 个字符。";
+		}
 		if (!Uri.TryCreate(ServerUrl.Trim(), UriKind.Absolute, out Uri? serverUri) || !new[] { "http", "https", "ws", "wss" }.Contains(serverUri.Scheme, StringComparer.OrdinalIgnoreCase))
 		{
 			return "服务端地址必须是 http、https、ws 或 wss 地址。";
@@ -116,3 +220,6 @@ public sealed record ClientConfiguration(string ServerUrl, string TunnelId, stri
 		return null;
 	}
 }
+
+/// <summary>Web 管理端提交的隧道配置，密钥为空时表示沿用已有密钥。</summary>
+public sealed record ClientConfigurationRequest(string Name, string ServerUrl, string TunnelId, string Token, string LocalHost, int LocalPort, bool Enabled);

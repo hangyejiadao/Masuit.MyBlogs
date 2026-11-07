@@ -22,6 +22,7 @@ services:
       TZ: Asia/Shanghai
     ports:
       - "${APP_PORT:-5000}:5000"
+      - "10000-10100:10000-10100"
     volumes:
       # Config must be editable on the host without rebuilding the image.
       - ./appsettings.json:/app/appsettings.json:ro

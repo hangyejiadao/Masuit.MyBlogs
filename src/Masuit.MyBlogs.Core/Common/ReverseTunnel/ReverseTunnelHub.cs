@@ -126,24 +126,35 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 			return;
 		}
 		WebSocket socket = await context.WebSockets.AcceptWebSocketAsync();
-		using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
-		JsonDocument? hello = await ReceiveJsonAsync(socket, lifetime.Token);
-		if (!TryReadDataHello(hello, out var tunnelId, out var connectionId, out var token)
-			|| !TryAuthenticate(tunnelId, token, out _)
-			|| !_pending.TryGetValue(connectionId, out var pending)
-			|| !pending.Matches(tunnelId))
+		var handedOff = false;
+		try
 		{
-			await CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "数据连接认证失败");
-			socket.Dispose();
-			return;
+			using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+			JsonDocument? hello = await ReceiveJsonAsync(socket, lifetime.Token);
+			if (!TryReadDataHello(hello, out var tunnelId, out var connectionId, out var token)
+				|| !TryAuthenticate(tunnelId, token, out _)
+				|| !_pending.TryGetValue(connectionId, out var pending)
+				|| !pending.Matches(tunnelId))
+			{
+				await CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "数据连接认证失败");
+				return;
+			}
+			await SendAsync(socket, new { type = "ready", connectionId }, lifetime.Token);
+			if (!pending.TrySetSocket(socket))
+			{
+				await CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "连接已失效");
+				return;
+			}
+			handedOff = true;
+			// 成功配对后，ForwardAsync 接管 WebSocket 的生命周期。
 		}
-		await SendAsync(socket, new { type = "ready", connectionId }, lifetime.Token);
-		if (!pending.TrySetSocket(socket))
+		finally
 		{
-			await CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "连接已失效");
-			socket.Dispose();
+			if (!handedOff)
+			{
+				socket.Dispose();
+			}
 		}
-		// 成功配对后，ForwardAsync 接管 WebSocket 的生命周期。
 	}
 
 	/// <summary>

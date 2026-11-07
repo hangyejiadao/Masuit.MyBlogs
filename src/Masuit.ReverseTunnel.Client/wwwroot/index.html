@@ -61,8 +61,9 @@
       <label class="full">服务端地址
         <input id="serverUrl" placeholder="https://example.com">
       </label>
-      <label>服务端密钥
-        <input id="token" type="password" autocomplete="off" placeholder="新增时必填，编辑时留空表示沿用">
+      <label>客户端授权密钥
+        <input id="token" type="password" autocomplete="new-password" placeholder="新增时必填，编辑时留空表示沿用">
+        <small id="tokenHint">客户端授权密钥必须与服务端对应隧道的密钥完全一致。</small>
       </label>
       <label>本地目标主机
         <input id="localHost" value="host.docker.internal">
@@ -85,8 +86,8 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>名称</th><th>服务端</th><th>隧道编号</th><th>本地目标</th><th>启用</th><th>状态</th><th>操作</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="7" class="empty">正在读取配置...</td></tr></tbody>
+        <thead><tr><th>名称</th><th>服务端</th><th>隧道编号</th><th>授权密钥</th><th>本地目标</th><th>启用</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="empty">正在读取配置...</td></tr></tbody>
       </table>
     </div>
     <div id="status" class="status">正在读取状态...</div>
@@ -105,11 +106,11 @@ function stateLabel(state) { return ({ Connected: '已连接', Connecting: '连�
 function stateClass(state) { return String(state || '').toLowerCase(); }
 function readForm() { return { Name: $('name').value, ServerUrl: $('serverUrl').value, TunnelId: $('tunnelId').value, Token: $('token').value, LocalHost: $('localHost').value, LocalPort: Number($('localPort').value), Enabled: $('enabled').checked }; }
 function resetForm() { editingId = 0; $('editorTitle').textContent = '新增隧道'; $('name').value = ''; $('serverUrl').value = ''; $('tunnelId').value = ''; $('token').value = ''; $('localHost').value = 'host.docker.internal'; $('localPort').value = 22; $('enabled').checked = false; }
-function openEditor(config) { editingId = config?.id || 0; $('editorTitle').textContent = editingId ? '编辑隧道' : '新增隧道'; $('name').value = config?.name || ''; $('serverUrl').value = config?.serverUrl || ''; $('tunnelId').value = config?.tunnelId || ''; $('token').value = ''; $('localHost').value = config?.localHost || 'host.docker.internal'; $('localPort').value = config?.localPort || 22; $('enabled').checked = Boolean(config?.enabled); $('editor').classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function openEditor(config) { editingId = config?.id || 0; $('editorTitle').textContent = editingId ? '编辑隧道' : '新增隧道'; $('name').value = config?.name || ''; $('serverUrl').value = config?.serverUrl || ''; $('tunnelId').value = config?.tunnelId || ''; $('token').value = ''; $('tokenHint').textContent = editingId ? (config?.tokenConfigured ? '已配置授权密钥；留空表示沿用，填写新密钥会替换旧密钥。' : '尚未配置授权密钥，请填写后再连接。') : '客户端授权密钥必须与服务端对应隧道的密钥完全一致。'; $('localHost').value = config?.localHost || 'host.docker.internal'; $('localPort').value = config?.localPort || 22; $('enabled').checked = Boolean(config?.enabled); $('editor').classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function closeEditor() { $('editor').classList.add('hidden'); resetForm(); }
 async function request(url, options = {}) { const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options }); const data = await response.json(); if (!response.ok) throw new Error(data.message || '请求失败'); return data; }
 async function load() { try { const [configData, statusData] = await Promise.all([request('/api/config'), request('/api/status')]); configs = configData; statuses = new Map(statusData.map(item => [item.id, item])); render(); show(`已加载 ${configs.length} 条隧道配置。`); } catch (error) { show(error.message); } }
-function render() { if (!configs.length) { $('rows').innerHTML = '<tr><td colspan="7" class="empty">暂无隧道配置，点击“新增隧道”开始。</td></tr>'; return; } $('rows').innerHTML = configs.map(config => { const status = statuses.get(config.id) || { state: 'Stopped' }; const state = status.state || 'Stopped'; const action = config.enabled ? `<button class="muted" data-action="disconnect" data-id="${config.id}">断开</button>` : `<button class="success" data-action="connect" data-id="${config.id}">连接</button>`; return `<tr><td><strong>${escapeHtml(config.name)}</strong></td><td>${escapeHtml(config.serverUrl)}</td><td class="nowrap">${escapeHtml(config.tunnelId)}</td><td class="nowrap">${escapeHtml(config.localHost)}:${config.localPort}</td><td>${config.enabled ? '是' : '否'}</td><td><span class="pill ${stateClass(state)}">${stateLabel(state)}</span>${status.lastError ? `<br><small>${escapeHtml(status.lastError)}</small>` : ''}</td><td class="nowrap"><div class="actions">${action}<button class="outline" data-action="edit" data-id="${config.id}">编辑</button><button class="danger" data-action="delete" data-id="${config.id}">删除</button></div></td></tr>`; }).join(''); }
+function render() { if (!configs.length) { $('rows').innerHTML = '<tr><td colspan="8" class="empty">暂无隧道配置，点击“新增隧道”开始。</td></tr>'; return; } $('rows').innerHTML = configs.map(config => { const status = statuses.get(config.id) || { state: 'Stopped' }; const state = status.state || 'Stopped'; const action = config.enabled ? `<button class="muted" data-action="disconnect" data-id="${config.id}">断开</button>` : `<button class="success" data-action="connect" data-id="${config.id}">连接</button>`; const tokenStatus = config.tokenConfigured ? '<span class="pill connected">已配置</span>' : '<span class="pill faulted">未配置</span>'; return `<tr><td><strong>${escapeHtml(config.name)}</strong></td><td>${escapeHtml(config.serverUrl)}</td><td class="nowrap">${escapeHtml(config.tunnelId)}</td><td>${tokenStatus}</td><td class="nowrap">${escapeHtml(config.localHost)}:${config.localPort}</td><td>${config.enabled ? '是' : '否'}</td><td><span class="pill ${stateClass(state)}">${stateLabel(state)}</span>${status.lastError ? `<br><small>${escapeHtml(status.lastError)}</small>` : ''}</td><td class="nowrap"><div class="actions">${action}<button class="outline" data-action="edit" data-id="${config.id}">编辑</button><button class="danger" data-action="delete" data-id="${config.id}">删除</button></div></td></tr>`; }).join(''); }
 async function save() { try { const body = readForm(); const url = editingId ? `/api/config/${editingId}` : '/api/config'; await request(url, { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(body) }); closeEditor(); await load(); show('配置已保存。'); } catch (error) { show(error.message); } }
 async function edit(id) { try { const config = await request(`/api/config/${id}`); openEditor(config); } catch (error) { show(error.message); } }
 async function toggle(id, action) { try { await request(`/api/config/${id}/${action}`, { method: 'POST' }); await load(); show(action === 'connect' ? '正在连接服务端...' : '已断开连接。'); } catch (error) { show(error.message); } }

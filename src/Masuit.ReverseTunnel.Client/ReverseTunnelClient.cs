@@ -11,10 +11,12 @@ namespace Masuit.ReverseTunnel.Client;
 public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 {
 	private const int MaxJsonMessageBytes = 16 * 1024;
+	private static readonly TimeSpan ControlHeartbeatInterval = TimeSpan.FromSeconds(15);
 
 	public async Task RunSessionAsync(ClientConfiguration configuration, CancellationToken cancellationToken, Action<DateTimeOffset> connected)
 	{
 		using var control = new ClientWebSocket();
+		control.Options.KeepAliveInterval = ControlHeartbeatInterval;
 		await control.ConnectAsync(BuildEndpointUri(configuration.ServerUrl, "/tunnel/control"), cancellationToken);
 		await SendJsonAsync(control, new { type = "hello", tunnelId = configuration.TunnelId, token = configuration.Token }, cancellationToken);
 		using JsonDocument welcome = await ReceiveJsonAsync(control, cancellationToken) ?? throw new InvalidOperationException("服务端未返回 welcome，密钥或隧道编号可能不正确。");
@@ -22,8 +24,35 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		{
 			throw new InvalidOperationException("服务端拒绝了隧道注册，请检查密钥和白名单。");
 		}
+		int? listenPort = welcome.RootElement.TryGetProperty("listenPort", out JsonElement listenPortElement) && listenPortElement.TryGetInt32(out int port)
+			? port
+			: null;
 		connected(DateTimeOffset.UtcNow);
-		logger.LogInformation("反向隧道控制连接已建立，隧道={TunnelId}", configuration.TunnelId);
+		logger.LogInformation("反向隧道控制连接已建立，隧道={TunnelId}，服务端监听端口={ListenPort}", configuration.TunnelId, listenPort?.ToString() ?? "未知");
+		using var sessionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		Task receive = ReceiveControlMessagesAsync(control, configuration, sessionCancellation.Token);
+		Task heartbeat = SendHeartbeatAsync(control, sessionCancellation.Token);
+		Task completed = await Task.WhenAny(receive, heartbeat);
+		sessionCancellation.Cancel();
+		try
+		{
+			await Task.WhenAll(receive, heartbeat);
+		}
+		catch (OperationCanceledException) when (sessionCancellation.IsCancellationRequested)
+		{
+		}
+		if (!cancellationToken.IsCancellationRequested && completed.IsFaulted)
+		{
+			Exception? exception = completed.Exception?.GetBaseException();
+			if (exception is not null)
+			{
+				throw exception;
+			}
+		}
+	}
+
+	private async Task ReceiveControlMessagesAsync(ClientWebSocket control, ClientConfiguration configuration, CancellationToken cancellationToken)
+	{
 		while (control.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
 		{
 			using JsonDocument? message = await ReceiveJsonAsync(control, cancellationToken);
@@ -33,8 +62,19 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 			}
 			if (IsMessage(message, "open") && message.RootElement.TryGetProperty("connectionId", out JsonElement id))
 			{
-				_ = HandleConnectionAsync(configuration, id.GetString() ?? string.Empty, cancellationToken);
+				string connectionId = id.GetString() ?? string.Empty;
+				logger.LogInformation("收到公网连接请求，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
+				_ = HandleConnectionAsync(configuration, connectionId, cancellationToken);
 			}
+		}
+	}
+
+	private static async Task SendHeartbeatAsync(ClientWebSocket control, CancellationToken cancellationToken)
+	{
+		while (control.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+		{
+			await Task.Delay(ControlHeartbeatInterval, cancellationToken);
+			await SendJsonAsync(control, new { type = "ping" }, cancellationToken);
 		}
 	}
 
@@ -49,13 +89,16 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		try
 		{
 			await data.ConnectAsync(BuildEndpointUri(configuration.ServerUrl, "/tunnel/data"), cancellationToken);
+			logger.LogDebug("数据通道已连接，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
 			await SendJsonAsync(data, new { type = "data", tunnelId = configuration.TunnelId, connectionId, token = configuration.Token }, cancellationToken);
 			using JsonDocument ready = await ReceiveJsonAsync(data, cancellationToken) ?? throw new InvalidOperationException("服务端未确认数据连接。");
 			if (!IsMessage(ready, "ready"))
 			{
 				throw new InvalidOperationException("服务端拒绝了数据连接，密钥校验失败或连接已过期。");
 			}
+			logger.LogDebug("数据通道认证成功，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
 			await local.ConnectAsync(configuration.LocalHost, configuration.LocalPort, cancellationToken);
+			logger.LogDebug("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, configuration.LocalHost, configuration.LocalPort);
 			using NetworkStream localStream = local.GetStream();
 			using var relayCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			Task upload = CopyLocalToWebSocketAsync(localStream, data, relayCancellation.Token);

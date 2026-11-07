@@ -12,6 +12,7 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 {
 	private const int MaxJsonMessageBytes = 16 * 1024;
 	private static readonly TimeSpan ControlHeartbeatInterval = TimeSpan.FromSeconds(15);
+	private static readonly TimeSpan ControlHeartbeatTimeout = TimeSpan.FromSeconds(10);
 
 	public async Task RunSessionAsync(ClientConfiguration configuration, CancellationToken cancellationToken, Action<DateTimeOffset> connected)
 	{
@@ -30,8 +31,9 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		connected(DateTimeOffset.UtcNow);
 		logger.LogInformation("反向隧道控制连接已建立，隧道={TunnelId}，服务端监听端口={ListenPort}", configuration.TunnelId, listenPort?.ToString() ?? "未知");
 		using var sessionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-		Task receive = ReceiveControlMessagesAsync(control, configuration, sessionCancellation.Token);
-		Task heartbeat = SendHeartbeatAsync(control, sessionCancellation.Token);
+		var heartbeatMonitor = new HeartbeatMonitor();
+		Task receive = ReceiveControlMessagesAsync(control, configuration, heartbeatMonitor, sessionCancellation.Token);
+		Task heartbeat = SendHeartbeatAsync(control, heartbeatMonitor, sessionCancellation.Token);
 		Task completed = await Task.WhenAny(receive, heartbeat);
 		sessionCancellation.Cancel();
 		try
@@ -51,7 +53,7 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		}
 	}
 
-	private async Task ReceiveControlMessagesAsync(ClientWebSocket control, ClientConfiguration configuration, CancellationToken cancellationToken)
+	private async Task ReceiveControlMessagesAsync(ClientWebSocket control, ClientConfiguration configuration, HeartbeatMonitor heartbeatMonitor, CancellationToken cancellationToken)
 	{
 		while (control.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
 		{
@@ -59,6 +61,11 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 			if (message is null)
 			{
 				return;
+			}
+			if (IsMessage(message, "pong"))
+			{
+				heartbeatMonitor.MarkPong();
+				continue;
 			}
 			if (IsMessage(message, "open") && message.RootElement.TryGetProperty("connectionId", out JsonElement id))
 			{
@@ -69,12 +76,14 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		}
 	}
 
-	private static async Task SendHeartbeatAsync(ClientWebSocket control, CancellationToken cancellationToken)
+	private static async Task SendHeartbeatAsync(ClientWebSocket control, HeartbeatMonitor heartbeatMonitor, CancellationToken cancellationToken)
 	{
 		while (control.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
 		{
 			await Task.Delay(ControlHeartbeatInterval, cancellationToken);
+			long pongVersion = heartbeatMonitor.PongVersion;
 			await SendJsonAsync(control, new { type = "ping" }, cancellationToken);
+			await heartbeatMonitor.WaitForNextPongAsync(pongVersion, ControlHeartbeatTimeout, cancellationToken);
 		}
 	}
 
@@ -195,5 +204,27 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 	{
 		return message.RootElement.TryGetProperty("type", out JsonElement type)
 			&& string.Equals(type.GetString(), expectedType, StringComparison.Ordinal);
+	}
+
+	private sealed class HeartbeatMonitor
+	{
+		private long _pongVersion;
+
+		public long PongVersion => Interlocked.Read(ref _pongVersion);
+
+		public void MarkPong()
+		{
+			Interlocked.Increment(ref _pongVersion);
+		}
+
+		public async Task WaitForNextPongAsync(long previousVersion, TimeSpan timeout, CancellationToken cancellationToken)
+		{
+			using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			timeoutCancellation.CancelAfter(timeout);
+			while (PongVersion == previousVersion)
+			{
+				await Task.Delay(TimeSpan.FromMilliseconds(250), timeoutCancellation.Token);
+			}
+		}
 	}
 }

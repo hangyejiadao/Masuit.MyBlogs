@@ -95,6 +95,29 @@ return ResultData(new { Total = total, Items = items });
 }
 
 /// <summary>
+/// 查询一条规则最近收到的 TCP 连接记录，来源地址只对管理员开放，服务重启后记录会清空。
+/// </summary>
+/// <param name="ruleId">规则 id。</param>
+/// <param name="limit">最多返回条数，最大 500。</param>
+/// <returns></returns>
+[HttpGet, MyAuthorize]
+public IActionResult RecentRequests(int ruleId, int limit = 100)
+{
+	var rule = PortForwardRuleService.GetById(ruleId);
+	if (rule == null)
+	{
+		return ResultData(null, false, "端口转发规则不存在！");
+	}
+
+	return ResultData(new
+	{
+		RuleId = rule.Id,
+		RuleName = rule.Name,
+		Items = PortForwardRuntime.GetRecentRequests(rule.Id, Math.Clamp(limit, 1, 500))
+	});
+}
+
+/// <summary>
 /// 新建或修改端口转发规则，保存成功后同步转发引擎使新规则即时生效。
 /// 监听端口必须落在 10000-10100：博客运行在 Docker 容器中，只有该端口段会发布到宿主机，
 /// 区间外的端口即使在容器内监听成功，外部也连接不进来

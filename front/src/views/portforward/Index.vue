@@ -23,7 +23,7 @@
           <td class="text-center">{{ row.ActiveConnections }}</td>
           <td class="text-right">{{ formatBytes(row.TotalBytes) }}</td>
           <td class="text-left">{{ row.Remark || '-' }}</td>
-          <td class="text-center"><q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" /><q-btn flat dense size="sm" color="negative" label="删除" @click="askDelete(row)" /></td>
+          <td class="text-center"><q-btn flat dense size="sm" color="primary" icon="history" label="请求记录" @click="openRequests(row)" /><q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" /><q-btn flat dense size="sm" color="negative" label="删除" @click="askDelete(row)" /></td>
         </tr>
         <tr v-if="!loading && rows.length === 0"><td colspan="11" class="text-center text-grey">暂无数据</td></tr>
       </tbody>
@@ -55,12 +55,46 @@
   </q-dialog>
 
   <q-dialog v-model="showDelete" persistent><q-card style="min-width: 320px"><q-card-section><div class="text-h6">删除规则</div></q-card-section><q-card-section>确定要删除规则「{{ deleteTarget?.Name }}」（监听端口 {{ deleteTarget?.ListenPort }}）吗？删除后该监听会立即卸载。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" @click="showDelete = false" /><q-btn color="negative" label="删除" :loading="submitting" @click="doDelete" /></q-card-actions></q-card></q-dialog>
+
+  <q-dialog v-model="showRequests">
+    <q-card style="width: min(1100px, 95vw); max-width: 1100px">
+      <q-card-section class="row items-center justify-between">
+        <div>
+          <div class="text-h6">请求记录</div>
+          <div class="text-caption text-grey">{{ requestRule?.Name }} · 监听端口 {{ requestRule?.ListenPort }} · 最多保留 500 条，当前显示最近 100 条，服务重启后清空</div>
+        </div>
+        <q-btn flat round dense icon="refresh" :loading="requestsLoading" @click="requestRule && loadRequests(requestRule.Id)"><q-tooltip>刷新记录</q-tooltip></q-btn>
+      </q-card-section>
+      <q-separator />
+      <q-card-section class="q-pa-none">
+        <q-markup-table flat separator="cell" wrap-cells>
+          <thead><tr><th class="text-left">访问时间</th><th class="text-left">来源 IP</th><th class="text-right">来源端口</th><th class="text-right">监听端口</th><th class="text-left">隧道编号</th><th class="text-center">状态</th><th class="text-right">耗时</th><th class="text-right">流量</th><th class="text-left">错误</th></tr></thead>
+          <tbody>
+            <tr v-for="item in requestRows" :key="item.Id">
+              <td class="text-left">{{ formatDate(item.StartedAt) }}</td>
+              <td class="text-left"><code>{{ item.RemoteIp }}</code></td>
+              <td class="text-right">{{ item.RemotePort ?? '-' }}</td>
+              <td class="text-right">{{ item.ListenPort }}</td>
+              <td class="text-left">{{ item.TunnelId || '-' }}</td>
+              <td class="text-center"><q-badge :color="requestStatusColor(item.Status)" :label="item.Status" /></td>
+              <td class="text-right">{{ formatDuration(item.DurationMs) }}</td>
+              <td class="text-right">{{ formatBytes(item.Bytes) }}</td>
+              <td class="text-left"><span v-if="item.Error" class="text-negative">{{ item.Error }}</span><span v-else>-</span></td>
+            </tr>
+            <tr v-if="!requestsLoading && requestRows.length === 0"><td colspan="9" class="text-center text-grey q-pa-lg">暂无访问记录</td></tr>
+          </tbody>
+        </q-markup-table>
+      </q-card-section>
+      <q-card-actions align="right"><q-btn flat label="关闭" @click="showRequests = false" /></q-card-actions>
+    </q-card>
+  </q-dialog>
 </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue3-toastify'
+import dayjs from 'dayjs'
 import api from '@/axios/AxiosConfig'
 
 interface RuleRow {
@@ -82,6 +116,22 @@ interface RuleRow {
   TotalBytes: number
 }
 interface ApiResponse { Data?: any; Message?: string; Success?: boolean }
+interface RequestRow {
+  Id: number
+  RuleId: number
+  RuleName: string
+  Mode: number
+  ListenPort: number
+  TunnelId?: string
+  RemoteIp: string
+  RemotePort?: number
+  StartedAt: string
+  CompletedAt?: string
+  DurationMs: number
+  Status: string
+  Error?: string
+  Bytes: number
+}
 
 const modeOptions = [{ label: '普通直连', value: 0 }, { label: '内网穿透（客户端主动连接）', value: 1 }]
 const rows = ref<RuleRow[]>([])
@@ -95,8 +145,15 @@ const showDialog = ref(false)
 const form = ref({ Id: 0, Name: '', Mode: 0, ListenPort: 10000, TargetHost: '', TargetPort: 0, Path: '', TunnelId: '', TunnelToken: '', Enabled: true, Remark: '' })
 const showDelete = ref(false)
 const deleteTarget = ref<RuleRow | null>(null)
+const showRequests = ref(false)
+const requestsLoading = ref(false)
+const requestRule = ref<RuleRow | null>(null)
+const requestRows = ref<RequestRow[]>([])
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
 const formatBytes = (bytes: number) => { if (!bytes) return '0 B'; const units = ['B', 'KB', 'MB', 'GB', 'TB']; const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024))); return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2) + ' ' + units[i] }
+const formatDate = (value: string) => value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'
+const formatDuration = (milliseconds: number) => milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(2)} s`
+const requestStatusColor = (status: string) => status === '已完成' ? 'positive' : status === '处理中' ? 'info' : status === '已取消' ? 'grey' : 'negative'
 const load = async () => { loading.value = true; try { const res = await api.get('/PortForward/PortForwardPage', { params: { page: page.value, size: size.value, keyword: keyword.value } }) as ApiResponse; rows.value = res.Data?.Items ?? []; total.value = res.Data?.Total ?? 0 } finally { loading.value = false } }
 const reload = () => { page.value = 1; load() }
 const openCreate = () => { form.value = { Id: 0, Name: '', Mode: 0, ListenPort: 10000, TargetHost: '', TargetPort: 0, Path: '', TunnelId: '', TunnelToken: '', Enabled: true, Remark: '' }; showDialog.value = true }
@@ -119,6 +176,8 @@ const save = async () => {
 }
 const toggleEnabled = async (row: RuleRow) => { const ok = await savePayload({ Id: row.Id, Name: row.Name, Mode: row.Mode, ListenPort: row.ListenPort, TargetHost: row.TargetHost, TargetPort: row.TargetPort, Path: row.Path ?? '', TunnelId: row.TunnelId ?? '', TunnelToken: '', Enabled: !row.Enabled, Remark: row.Remark ?? '' }); if (ok) load() }
 const askDelete = (row: RuleRow) => { deleteTarget.value = row; showDelete.value = true }
+const openRequests = (row: RuleRow) => { requestRule.value = row; requestRows.value = []; showRequests.value = true; loadRequests(row.Id) }
+const loadRequests = async (ruleId: number) => { requestsLoading.value = true; try { const res = await api.get('/PortForward/RecentRequests', { params: { ruleId, limit: 100 } }) as ApiResponse; if (requestRule.value?.Id === ruleId) requestRows.value = res.Data?.Items ?? [] } finally { requestsLoading.value = false } }
 const doDelete = async () => { if (!deleteTarget.value) return; submitting.value = true; try { const res = await api.post('/PortForward/DeletePortForward', { Id: deleteTarget.value.Id }) as ApiResponse; if (res.Success) { toast.success(res.Message || '删除成功'); showDelete.value = false; load() } else toast.error(res.Message || '删除失败') } finally { submitting.value = false } }
 onMounted(load)
 </script>

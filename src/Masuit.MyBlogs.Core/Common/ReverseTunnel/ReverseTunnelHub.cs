@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Masuit.MyBlogs.Core.Common;
 using Masuit.MyBlogs.Core.Models.Entity;
 
 namespace Masuit.MyBlogs.Core.Common.ReverseTunnel;
@@ -164,20 +165,23 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 	/// <param name="rule">当前端口转发规则。</param>
 	/// <param name="client">公网入站 TCP 连接。</param>
 	/// <param name="counters">用于累计活跃连接和流量的计数器。</param>
+	/// <param name="request">当前公网连接的请求记录。</param>
 	/// <param name="cancellationToken">规则停止或应用退出取消标记。</param>
 	/// <returns>连接关闭后完成的任务。</returns>
-	public async Task ForwardAsync(PortForwardRule rule, TcpClient client, PortForwardCounters counters, CancellationToken cancellationToken)
+	public async Task ForwardAsync(PortForwardRule rule, TcpClient client, PortForwardCounters counters, PortForwardRequestRecord request, CancellationToken cancellationToken)
 	{
 		string tunnelId = rule.TunnelId?.Trim() ?? string.Empty;
 		if (tunnelId.Length == 0 || !_sessions.TryGetValue(tunnelId, out var session))
 		{
 			logger.LogWarning("公网连接到达但内网隧道控制会话不存在，规则={RuleId}，隧道={TunnelId}，监听端口={ListenPort}", rule.Id, tunnelId, rule.ListenPort);
+			request.MarkFailed("内网客户端未连接");
 			return;
 		}
 		var connectionId = Guid.NewGuid().ToString("N");
 		var pending = new PendingConnection(connectionId, tunnelId, client);
 		if (!_pending.TryAdd(connectionId, pending))
 		{
+			request.MarkFailed("创建转发连接失败");
 			return;
 		}
 		try
@@ -186,25 +190,31 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 			using WebSocket? dataSocket = await pending.Socket.Task.WaitAsync(DataConnectionTimeout, cancellationToken);
 			if (dataSocket is null)
 			{
+				request.MarkFailed("内网客户端数据通道未建立");
 				return;
 			}
-			await RelayAsync(client.GetStream(), dataSocket, counters, cancellationToken);
+			await RelayAsync(client.GetStream(), dataSocket, counters, request, cancellationToken);
+			request.MarkCompleted();
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
+			request.MarkCancelled();
 		}
 		catch (TimeoutException)
 		{
 			logger.LogWarning("内网隧道数据连接超时，规则={RuleId}，隧道={TunnelId}", rule.Id, rule.TunnelId);
+			request.MarkFailed("内网客户端数据通道连接超时");
 		}
 		catch (WebSocketException exception)
 		{
 			logger.LogWarning(exception, "内网隧道数据连接异常，规则={RuleId}，隧道={TunnelId}", rule.Id, tunnelId);
+			request.MarkFailed("内网隧道数据连接异常");
 			RemoveSessionIfCurrent(tunnelId, session);
 		}
 		catch (Exception exception)
 		{
 			logger.LogWarning(exception, "内网隧道转发失败，规则={RuleId}，隧道={TunnelId}", rule.Id, tunnelId);
+			request.MarkFailed("内网隧道转发失败");
 			RemoveSessionIfCurrent(tunnelId, session);
 		}
 		finally
@@ -387,13 +397,14 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 	/// <param name="tcpStream">公网 TCP 流。</param>
 	/// <param name="socket">内网数据 WebSocket。</param>
 	/// <param name="counters">流量统计。</param>
+	/// <param name="request">当前公网连接的请求记录。</param>
 	/// <param name="cancellationToken">取消标记。</param>
 	/// <returns>任一方向结束后完成的任务。</returns>
-	private static async Task RelayAsync(NetworkStream tcpStream, WebSocket socket, PortForwardCounters counters, CancellationToken cancellationToken)
+	private static async Task RelayAsync(NetworkStream tcpStream, WebSocket socket, PortForwardCounters counters, PortForwardRequestRecord request, CancellationToken cancellationToken)
 	{
 		using var relay = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-		Task upload = CopyTcpToWebSocketAsync(tcpStream, socket, counters, relay.Token);
-		Task download = CopyWebSocketToTcpAsync(socket, tcpStream, counters, relay.Token);
+		Task upload = CopyTcpToWebSocketAsync(tcpStream, socket, counters, request, relay.Token);
+		Task download = CopyWebSocketToTcpAsync(socket, tcpStream, counters, request, relay.Token);
 		await Task.WhenAny(upload, download);
 		relay.Cancel();
 		try
@@ -409,9 +420,10 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 	/// <param name="source">TCP 输入流。</param>
 	/// <param name="socket">WebSocket 输出端。</param>
 	/// <param name="counters">流量统计。</param>
+	/// <param name="request">当前公网连接的请求记录。</param>
 	/// <param name="cancellationToken">取消标记。</param>
 	/// <returns>输入流结束后完成的任务。</returns>
-	private static async Task CopyTcpToWebSocketAsync(NetworkStream source, WebSocket socket, PortForwardCounters counters, CancellationToken cancellationToken)
+	private static async Task CopyTcpToWebSocketAsync(NetworkStream source, WebSocket socket, PortForwardCounters counters, PortForwardRequestRecord request, CancellationToken cancellationToken)
 	{
 		byte[] buffer = new byte[64 * 1024];
 		while (true)
@@ -423,6 +435,7 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 			}
 			await socket.SendAsync(buffer.AsMemory(0, read), WebSocketMessageType.Binary, true, cancellationToken);
 			Interlocked.Add(ref counters.TotalBytes, read);
+			request.AddBytes(read);
 		}
 	}
 
@@ -430,9 +443,10 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 	/// <param name="socket">WebSocket 输入端。</param>
 	/// <param name="destination">TCP 输出流。</param>
 	/// <param name="counters">流量统计。</param>
+	/// <param name="request">当前公网连接的请求记录。</param>
 	/// <param name="cancellationToken">取消标记。</param>
 	/// <returns>WebSocket 关闭后完成的任务。</returns>
-	private static async Task CopyWebSocketToTcpAsync(WebSocket socket, NetworkStream destination, PortForwardCounters counters, CancellationToken cancellationToken)
+	private static async Task CopyWebSocketToTcpAsync(WebSocket socket, NetworkStream destination, PortForwardCounters counters, PortForwardRequestRecord request, CancellationToken cancellationToken)
 	{
 		byte[] buffer = new byte[64 * 1024];
 		while (true)
@@ -448,6 +462,7 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 			}
 			await destination.WriteAsync(buffer.AsMemory(0, result.Count), cancellationToken);
 			Interlocked.Add(ref counters.TotalBytes, result.Count);
+			request.AddBytes(result.Count);
 		}
 	}
 

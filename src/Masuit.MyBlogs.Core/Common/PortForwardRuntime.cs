@@ -122,6 +122,21 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	private readonly ConcurrentDictionary<int, string> _startErrors = new();
 
 	/// <summary>
+	/// 每条规则最近收到的 TCP 连接记录，限制数量避免内存无限增长
+	/// </summary>
+	private readonly ConcurrentDictionary<int, ConcurrentQueue<PortForwardRequestRecord>> _requestRecords = new();
+
+	/// <summary>
+	/// 每条规则最多保留的最近请求记录数
+	/// </summary>
+	private const int MaxRequestRecordsPerRule = 500;
+
+	/// <summary>
+	/// 运行时请求记录自增编号
+	/// </summary>
+	private long _nextRequestId;
+
+	/// <summary>
 	/// 串行化多次同步，避免并发增删规则时重复绑定同一端口
 	/// </summary>
 	private readonly SemaphoreSlim _syncGate = new(1, 1);
@@ -261,6 +276,23 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	public PortForwardCounters GetCounters(int ruleId) => _counters.GetOrAdd(ruleId, static _ => new PortForwardCounters());
 
 	/// <summary>
+	/// 读取一条规则最近收到的 TCP 连接，结果按最新记录在前返回。
+	/// </summary>
+	/// <param name="ruleId">规则 id。</param>
+	/// <param name="limit">最多返回条数。</param>
+	/// <returns>请求记录快照。</returns>
+	public IReadOnlyList<PortForwardRequestRecordSnapshot> GetRecentRequests(int ruleId, int limit = 100)
+	{
+		limit = Math.Clamp(limit, 1, MaxRequestRecordsPerRule);
+		if (!_requestRecords.TryGetValue(ruleId, out var queue))
+		{
+			return [];
+		}
+
+		return queue.Reverse().Take(limit).Select(record => record.Snapshot()).ToList();
+	}
+
+	/// <summary>
 	/// 按请求路径匹配路径转发规则：路径等于规则前缀、或以「前缀 + /」开头（段边界）即命中，快照已按前缀长度降序排列，最长前缀优先；
 	/// 未命中返回 null。供代理中间件逐请求调用，只读快照、零分配
 	/// </summary>
@@ -390,7 +422,35 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 				continue;
 			}
 
-			_ = HandleConnectionAsync(forward, client);
+			var request = CreateRequestRecord(forward, client);
+			RecordRequest(forward.Rule.Id, request);
+			_ = HandleConnectionAsync(forward, client, request);
+		}
+	}
+
+	/// <summary>
+	/// 从公网 TCP 连接读取来源地址，并建立请求记录。
+	/// </summary>
+	private PortForwardRequestRecord CreateRequestRecord(ActiveForward forward, TcpClient client)
+	{
+		if (client.Client.RemoteEndPoint is IPEndPoint endpoint)
+		{
+			var address = endpoint.Address.IsIPv4MappedToIPv6 ? endpoint.Address.MapToIPv4() : endpoint.Address;
+			return new PortForwardRequestRecord(Interlocked.Increment(ref _nextRequestId), forward.Rule, address.ToString(), endpoint.Port);
+		}
+
+		return new PortForwardRequestRecord(Interlocked.Increment(ref _nextRequestId), forward.Rule, client.Client.RemoteEndPoint?.ToString() ?? "未知", null);
+	}
+
+	/// <summary>
+	/// 把请求记录加入对应规则的有界队列。
+	/// </summary>
+	private void RecordRequest(int ruleId, PortForwardRequestRecord request)
+	{
+		var queue = _requestRecords.GetOrAdd(ruleId, static _ => new ConcurrentQueue<PortForwardRequestRecord>());
+		queue.Enqueue(request);
+		while (queue.Count > MaxRequestRecordsPerRule && queue.TryDequeue(out _))
+		{
 		}
 	}
 
@@ -400,57 +460,68 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	/// <param name="forward"></param>
 	/// <param name="client"></param>
 	/// <returns></returns>
-	private async Task HandleConnectionAsync(ActiveForward forward, TcpClient client)
+	private async Task HandleConnectionAsync(ActiveForward forward, TcpClient client, PortForwardRequestRecord request)
 	{
 		Interlocked.Increment(ref forward.Counters.TotalConnections);
 		Interlocked.Increment(ref forward.Counters.ActiveConnections);
 		using var clientScope = client;
-		if (forward.Rule.Mode == PortForwardMode.ReverseTunnel)
+		try
 		{
+			if (forward.Rule.Mode == PortForwardMode.ReverseTunnel)
+			{
+				await reverseTunnelHub.ForwardAsync(forward.Rule, client, forward.Counters, request, forward.StopSource.Token);
+				return;
+			}
+			using var remote = new TcpClient();
 			try
 			{
-				await reverseTunnelHub.ForwardAsync(forward.Rule, client, forward.Counters, forward.StopSource.Token);
+				using var connectTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(ConnectTimeoutSeconds));
+				await remote.ConnectAsync(forward.Rule.TargetHost, forward.Rule.TargetPort, connectTimeout.Token);
 			}
-			finally
+			catch (Exception ex)
 			{
-				Interlocked.Decrement(ref forward.Counters.ActiveConnections);
+				request.MarkFailed($"连接目标失败：{ex.Message}");
+				logger.LogError(ex, "端口转发连接目标失败，规则={RuleId}，目标={TargetHost}:{TargetPort}", forward.Rule.Id, forward.Rule.TargetHost, forward.Rule.TargetPort);
+				return;
 			}
-			return;
-		}
-		using var remote = new TcpClient();
-		try
-		{
-			using var connectTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(ConnectTimeoutSeconds));
-			await remote.ConnectAsync(forward.Rule.TargetHost, forward.Rule.TargetPort, connectTimeout.Token);
-		}
-		catch (Exception ex)
-		{
-			logger.LogError(ex, "端口转发连接目标失败，规则={RuleId}，目标={TargetHost}:{TargetPort}", forward.Rule.Id, forward.Rule.TargetHost, forward.Rule.TargetPort);
-			Interlocked.Decrement(ref forward.Counters.ActiveConnections);
-			return;
-		}
 
-		try
-		{
 			using var connectionSource = CancellationTokenSource.CreateLinkedTokenSource(forward.StopSource.Token);
 			var clientStream = client.GetStream();
 			var remoteStream = remote.GetStream();
-			var upload = PumpAsync(clientStream, remoteStream, forward, connectionSource.Token);
-			var download = PumpAsync(remoteStream, clientStream, forward, connectionSource.Token);
+			var upload = PumpAsync(clientStream, remoteStream, forward, request, connectionSource.Token);
+			var download = PumpAsync(remoteStream, clientStream, forward, request, connectionSource.Token);
 			await Task.WhenAny(upload, download);
 			connectionSource.Cancel();
 			try
 			{
 				await Task.WhenAll(upload, download);
 			}
+			catch (OperationCanceledException) when (connectionSource.IsCancellationRequested)
+			{
+				if (forward.StopSource.IsCancellationRequested)
+				{
+					request.MarkCancelled();
+				}
+			}
 			catch (Exception ex)
 			{
-				// 任一方向先结束时取消另一方向属于正常收尾，这里只记录不处理
+				// 任一方向先结束时取消另一方向属于正常收尾；真正的异常才标记失败
 				logger.LogError(ex, "端口转发连接收尾异常，规则={RuleId}", forward.Rule.Id);
+				request.MarkFailed($"连接收尾异常：{ex.Message}");
 			}
+		}
+		catch (OperationCanceledException) when (forward.StopSource.IsCancellationRequested)
+		{
+			request.MarkCancelled();
+		}
+		catch (Exception ex)
+		{
+			request.MarkFailed($"转发失败：{ex.Message}");
+			logger.LogError(ex, "端口转发连接处理失败，规则={RuleId}", forward.Rule.Id);
 		}
 		finally
 		{
+			request.MarkCompleted();
 			Interlocked.Decrement(ref forward.Counters.ActiveConnections);
 		}
 	}
@@ -463,7 +534,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 	/// <param name="forward"></param>
 	/// <param name="cancellationToken"></param>
 	/// <returns></returns>
-	private static async Task PumpAsync(NetworkStream source, NetworkStream destination, ActiveForward forward, CancellationToken cancellationToken)
+	private static async Task PumpAsync(NetworkStream source, NetworkStream destination, ActiveForward forward, PortForwardRequestRecord request, CancellationToken cancellationToken)
 	{
 		var buffer = new byte[64 * 1024];
 		while (true)
@@ -476,6 +547,7 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 
 			await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
 			Interlocked.Add(ref forward.Counters.TotalBytes, read);
+			request.AddBytes(read);
 		}
 	}
 

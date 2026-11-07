@@ -343,6 +343,8 @@ public partial interface IApplicationInfoRepository : IBaseRepository<Applicatio
 
 public partial interface IAppLicenseRepository : IBaseRepository<AppLicense>;
 
+public partial interface ILicenseAccountBindingRepository : IBaseRepository<LicenseAccountBinding>;
+
 public partial interface IAppPricePlanRepository : IBaseRepository<AppPricePlan>;
 
 public partial interface IAppVersionRepository : IBaseRepository<AppVersion>;

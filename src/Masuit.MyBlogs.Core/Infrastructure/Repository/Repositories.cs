@@ -52,6 +52,8 @@ public sealed partial class ApplicationInfoRepository : BaseRepository<Applicati
 
 public sealed partial class AppLicenseRepository : BaseRepository<AppLicense>, IAppLicenseRepository;
 
+public sealed partial class LicenseAccountBindingRepository : BaseRepository<LicenseAccountBinding>, ILicenseAccountBindingRepository;
+
 public sealed partial class AppPricePlanRepository : BaseRepository<AppPricePlan>, IAppPricePlanRepository;
 
 public sealed partial class AppVersionRepository : BaseRepository<AppVersion>, IAppVersionRepository;

@@ -146,7 +146,8 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 				return;
 			}
 			handedOff = true;
-			// 成功配对后，ForwardAsync 接管 WebSocket 的生命周期。
+			// 保持当前 WebSocket 请求存活到转发结束，避免 ASP.NET 请求收尾时提前释放数据连接。
+			await pending.Completion.Task.WaitAsync(lifetime.Token);
 		}
 		finally
 		{
@@ -201,6 +202,7 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		finally
 		{
 			_pending.TryRemove(connectionId, out _);
+			pending.Complete();
 		}
 	}
 
@@ -440,6 +442,7 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		public string TunnelId { get; } = tunnelId;
 		public TcpClient Client { get; } = client;
 		public TaskCompletionSource<WebSocket?> Socket { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		public TaskCompletionSource<bool> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		public bool Matches(string tunnelId)
 		{
@@ -454,6 +457,12 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		public void Cancel()
 		{
 			Socket.TrySetResult(null);
+			Completion.TrySetResult(true);
+		}
+
+		public void Complete()
+		{
+			Completion.TrySetResult(true);
 		}
 	}
 

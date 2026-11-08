@@ -54,7 +54,7 @@
           <td class="text-center">
             <q-chip dense :color="statusColor(row)" text-color="white">{{ statusText(row) }}</q-chip>
           </td>
-          <td class="text-center">
+          <td class="text-center ops-cell">
             <q-btn flat dense size="sm" color="primary" label="编辑" @click="openEdit(row)" />
             <q-btn flat dense size="sm" color="purple" label="账号绑定" @click="openBind(row)" />
             <q-btn flat dense size="sm" color="teal" label="续期" @click="openRenew(row)" />
@@ -458,3 +458,10 @@ onMounted(() => {
   load()
 })
 </script>
+
+<style scoped>
+/* 操作列按钮字体调大一倍（用户 2026-11-08 要求）：原 size="sm" 约 14px，这里放大到 28px */
+.ops-cell :deep(.q-btn) {
+  font-size: 28px;
+}
+</style>

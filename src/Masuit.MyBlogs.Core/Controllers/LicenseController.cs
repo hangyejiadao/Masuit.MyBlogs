@@ -426,7 +426,7 @@ return ResultData(null, false, "所选价格方案不存在或不属于该应用
 }
 
 var startDate = cmd.StartDate.Date;
-var expireDate = plan == null? cmd.ExpireDate.Date: plan.ValidityDays > 0? startDate.AddDays(plan.ValidityDays): startDate.AddYears(100);
+var expireDate = cmd.ExpireDate.Date;
 if (expireDate < startDate)
 {
 return ResultData(null, false, "到期日期不能早于生效日期！");

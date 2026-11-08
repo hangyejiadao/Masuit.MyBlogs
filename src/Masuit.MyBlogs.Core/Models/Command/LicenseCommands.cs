@@ -119,7 +119,7 @@ public class AppLicenseCommand
 	public int UserInfoId { get; set; }
 
 	/// <summary>
-	/// 购买的价格方案id，可空；选了方案时成交价取方案价、到期日按方案天数从生效日起算
+	/// 购买的价格方案id，可空；选了方案时成交价取方案价；到期日以表单提交为准（后台选方案时按方案天数自动填充到期日，管理员可再改）
 	/// </summary>
 	public int? PricePlanId { get; set; }
 

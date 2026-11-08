@@ -84,10 +84,10 @@
       <q-card-section class="q-gutter-md">
         <q-select v-model="form.ApplicationInfoId" :options="appOptions" emit-value map-options outlined dense label="应用 *" @update:model-value="onAppChanged" />
         <q-select v-model="form.UserInfoId" :options="userOptions" emit-value map-options outlined dense label="被授权用户（用户管理中的普通用户，提醒发到其邮箱）*" />
-        <q-select v-model="form.PricePlanId" :options="planOptions" emit-value map-options clearable outlined dense label="价格方案（可选，选后按方案定价并自动算到期日）" @update:model-value="applyPlanExpiry" />
-        <div v-if="selectedPlan" class="text-grey text-caption">成交价 ¥{{ selectedPlan.Price }} 将记为快照；到期日 = 生效日 + {{ selectedPlan.ValidityDays > 0 ? selectedPlan.ValidityDays + ' 天' : '永久' }}</div>
+        <q-select v-model="form.PricePlanId" :options="planOptions" emit-value map-options clearable outlined dense label="价格方案（可选，选后按方案定价并自动填到期日）" @update:model-value="applyPlanExpiry" />
+        <div v-if="selectedPlan" class="text-grey text-caption">成交价 ¥{{ selectedPlan.Price }} 将记为快照；到期日已按生效日 + {{ selectedPlan.ValidityDays > 0 ? selectedPlan.ValidityDays + ' 天' : '永久' }}自动填好，可再手工修改</div>
         <q-input v-model="form.LicenseKey" outlined dense label="授权码（留空自动生成）" />
-        <q-input v-model="form.StartDate" outlined dense type="date" label="生效日期 *" @update:model-value="applyPlanExpiry" />
+        <q-input v-model="form.StartDate" outlined dense type="date" label="生效日期 *" />
         <q-input v-model="form.ExpireDate" outlined dense type="date" label="到期日期 *" />
         <q-input v-model="form.Remark" outlined dense type="textarea" rows="2" label="备注" />
       </q-card-section>
@@ -326,7 +326,6 @@ const save = async () => {
     toast.error('请选择应用和用户')
     return
   }
-  applyPlanExpiry()
   if (!form.value.StartDate || !form.value.ExpireDate) {
     toast.error('请选择生效和到期日期')
     return

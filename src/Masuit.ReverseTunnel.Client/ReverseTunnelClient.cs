@@ -71,8 +71,15 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 			if (IsMessage(message, "open") && message.RootElement.TryGetProperty("connectionId", out JsonElement id))
 			{
 				string connectionId = id.GetString() ?? string.Empty;
+				// 可选的每连接目标：路径转发时服务端会随 open 带上规则填写的目标，老规则不带则回退到客户端配置的默认目标
+				string? targetHost = message.RootElement.TryGetProperty("targetHost", out JsonElement hostElement) && hostElement.ValueKind == JsonValueKind.String
+					? hostElement.GetString()
+					: null;
+				int? targetPort = message.RootElement.TryGetProperty("targetPort", out JsonElement portElement) && portElement.TryGetInt32(out int portValue) && portValue > 0
+					? portValue
+					: null;
 				logger.LogInformation("收到公网连接请求，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
-				_ = HandleConnectionAsync(configuration, connectionId, cancellationToken);
+				_ = HandleConnectionAsync(configuration, connectionId, targetHost, targetPort, cancellationToken);
 			}
 		}
 	}
@@ -88,20 +95,23 @@ public sealed class ReverseTunnelClient(ILogger<ReverseTunnelClient> logger)
 		}
 	}
 
-	private async Task HandleConnectionAsync(ClientConfiguration configuration, string connectionId, CancellationToken cancellationToken)
+	private async Task HandleConnectionAsync(ClientConfiguration configuration, string connectionId, string? targetHost, int? targetPort, CancellationToken cancellationToken)
 	{
 		if (string.IsNullOrWhiteSpace(connectionId))
 		{
 			return;
 		}
+		// 服务端随 open 指定了目标（路径转发）时优先用它，缺失的部分回退到客户端配置的默认目标
+		string localHost = string.IsNullOrWhiteSpace(targetHost) ? configuration.LocalHost : targetHost;
+		int localPort = targetPort ?? configuration.LocalPort;
 		using var local = new TcpClient();
 		ClientWebSocket? data = null;
 		try
 		{
 			data = await ConnectDataSocketAsync(configuration, connectionId, cancellationToken);
 			logger.LogInformation("数据通道认证成功，隧道={TunnelId}，连接={ConnectionId}", configuration.TunnelId, connectionId);
-			await local.ConnectAsync(configuration.LocalHost, configuration.LocalPort, cancellationToken);
-			logger.LogInformation("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, configuration.LocalHost, configuration.LocalPort);
+			await local.ConnectAsync(localHost, localPort, cancellationToken);
+			logger.LogInformation("已连接本地目标，隧道={TunnelId}，连接={ConnectionId}，目标={LocalHost}:{LocalPort}", configuration.TunnelId, connectionId, localHost, localPort);
 			using NetworkStream localStream = local.GetStream();
 			using var relayCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			Task upload = CopyLocalToWebSocketAsync(localStream, data, relayCancellation.Token);

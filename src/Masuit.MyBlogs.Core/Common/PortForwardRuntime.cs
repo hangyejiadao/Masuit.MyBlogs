@@ -38,19 +38,29 @@ public sealed class PortForwardPathTarget
 	public int RuleId { get; init; }
 
 	/// <summary>
+	/// 转发模式：普通直连由代理中间件用 HttpClient 直连目标，内网穿透则逐请求经隧道打开字节流
+	/// </summary>
+	public PortForwardMode Mode { get; init; }
+
+	/// <summary>
 	/// 博客侧挂载前缀，如 /mcp；匹配时不区分大小写，要求段边界，转发时剥掉
 	/// </summary>
 	public string Path { get; init; }
 
 	/// <summary>
-	/// 目标主机：IP 或主机名
+	/// 目标主机：IP 或主机名；穿透模式下是客户端所在内网的地址，可为空（用客户端默认目标主机）
 	/// </summary>
 	public string TargetHost { get; init; }
 
 	/// <summary>
-	/// 目标端口
+	/// 目标端口；穿透模式下可为 0（用客户端默认目标端口）
 	/// </summary>
 	public int TargetPort { get; init; }
+
+	/// <summary>
+	/// 内网穿透编号；仅穿透模式有值，代理打开隧道字节流时用它定位客户端会话
+	/// </summary>
+	public string TunnelId { get; init; }
 }
 
 /// <summary>
@@ -195,13 +205,17 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 					rules = service.GetQuery(r => r.Enabled).ToList();
 				}
 
-				_pathTargets = rules.Where(r => r.Mode == PortForwardMode.Direct && !string.IsNullOrWhiteSpace(r.Path))
+				// 路径快照同时收普通直连与内网穿透规则：两者只要填了路径就启用路径代理，
+				// 穿透规则的监听端口 TCP 转发不受影响、照常在下方启动监听，两条入口并存
+				_pathTargets = rules.Where(r => !string.IsNullOrWhiteSpace(r.Path))
 					.Select(r => new PortForwardPathTarget
 					{
 						RuleId = r.Id,
+						Mode = r.Mode,
 						Path = r.Path.Trim(),
 						TargetHost = r.TargetHost,
-						TargetPort = r.TargetPort
+						TargetPort = r.TargetPort,
+						TunnelId = r.TunnelId?.Trim()
 					})
 					.OrderByDescending(t => t.Path.Length)
 					.ToArray();
@@ -315,6 +329,19 @@ public sealed class PortForwardRuntime(IServiceScopeFactory scopeFactory, ILogge
 		}
 
 		return null;
+	}
+
+	/// <summary>
+	/// 为一条穿透路径规则打开一条隧道字节流：逐 HTTP 请求调用，流的读写即内网目标服务的字节流，
+	/// 释放流即关闭本次隧道连接。隧道离线或数据通道超时会抛异常，由代理中间件按 502 处理。
+	/// 规则填写的目标原样传给隧道服务端：主机为空或端口为 0 时客户端回退到自身配置的默认目标
+	/// </summary>
+	/// <param name="target">命中的穿透路径规则快照</param>
+	/// <param name="cancellationToken"></param>
+	/// <returns>与内网目标服务相连的字节流</returns>
+	public Task<Stream> OpenTunnelStreamAsync(PortForwardPathTarget target, CancellationToken cancellationToken)
+	{
+		return reverseTunnelHub.OpenStreamAsync(target.TunnelId, target.TargetHost, target.TargetPort, cancellationToken);
 	}
 
 	/// <summary>

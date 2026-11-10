@@ -1,10 +1,13 @@
+using System.Net;
 using System.Net.Http;
 
 namespace Masuit.MyBlogs.Core.Common;
 
 /// <summary>
 /// 端口转发路径代理中间件：注册在管道前部（静态文件与 MVC 路由之前），逐请求按转发引擎的路径规则快照匹配。
-/// 命中时把请求剥掉规则前缀后透明代理到目标主机端口：方法、请求头（Authorization 等，跳过逐跳头）、请求体原样转发，
+/// 命中时把请求剥掉规则前缀后透明代理到目标主机端口：普通直连模式直接连接规则目标，
+/// 内网穿透模式经隧道逐请求打开一条字节流再在其上跑同样的 HTTP 代理，目标是客户端所在内网的服务；
+/// 方法、请求头（Authorization 等，跳过逐跳头）、请求体原样转发，
 /// 响应状态码、响应头、响应体原样回传且逐块冲刷（支持 SSE 长连接，如 MCP 的 Streamable HTTP）。
 /// 未命中直接放行、几乎零开销；代理失败（目标连不上等）返回 502 并写日志，不影响博客其他请求。
 /// 代理流量计入对应规则的运行时统计（活跃连接数、累计字节数：请求体 + 响应体），与 TCP 转发共用同一套计数
@@ -43,7 +46,9 @@ public sealed class PortForwardProxyMiddleware(RequestDelegate next, PortForward
 	}
 
 	/// <summary>
-	/// 执行一次代理：剥掉规则前缀拼目标地址，流式转发请求与响应，全程绑定客户端断开令牌
+	/// 执行一次代理：剥掉规则前缀拼目标地址，流式转发请求与响应，全程绑定客户端断开令牌。
+	/// 普通直连用命名的共享 HttpClient 直连目标；内网穿透逐请求新建 HttpClient，
+	/// 其连接回调经隧道打开一条字节流，目标地址只是逻辑地址（规则未填真实目标时用隧道编号占位），不做真实 DNS/TCP 连接
 	/// </summary>
 	/// <param name="context"></param>
 	/// <param name="target">命中的路径规则快照</param>
@@ -53,15 +58,39 @@ public sealed class PortForwardProxyMiddleware(RequestDelegate next, PortForward
 		var counters = runtime.GetCounters(target.RuleId);
 		Interlocked.Increment(ref counters.TotalConnections);
 		Interlocked.Increment(ref counters.ActiveConnections);
+		HttpClient ownedClient = null;
 		try
 		{
 			var requestPath = context.Request.Path.Value ?? string.Empty;
 			var remainder = requestPath.Length == target.Path.Length ? "/" : requestPath[target.Path.Length..];
-			var targetUrl = $"http://{target.TargetHost}:{target.TargetPort}{remainder}{context.Request.QueryString}";
+			string targetUrl;
+			HttpClient client;
+			if (target.Mode == PortForwardMode.ReverseTunnel)
+			{
+				var host = string.IsNullOrWhiteSpace(target.TargetHost) ? (string.IsNullOrWhiteSpace(target.TunnelId) ? "tunnel" : target.TunnelId) : target.TargetHost;
+				var port = target.TargetPort > 0 ? target.TargetPort : 80;
+				targetUrl = $"http://{host}:{port}{remainder}{context.Request.QueryString}";
+				ownedClient = new HttpClient(new SocketsHttpHandler
+				{
+					AllowAutoRedirect = false,
+					AutomaticDecompression = DecompressionMethods.None,
+					UseProxy = false,
+					UseCookies = false,
+					ConnectCallback = (_, ct) => new ValueTask<Stream>(runtime.OpenTunnelStreamAsync(target, ct))
+				})
+				{
+					Timeout = Timeout.InfiniteTimeSpan
+				};
+				client = ownedClient;
+			}
+			else
+			{
+				targetUrl = $"http://{target.TargetHost}:{target.TargetPort}{remainder}{context.Request.QueryString}";
+				client = httpClientFactory.CreateClient(PortForwardRuntime.ProxyHttpClientName);
+			}
 			using var requestMessage = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
 			BuildRequestContent(context, requestMessage, counters);
 			CopyRequestHeaders(context, requestMessage);
-			var client = httpClientFactory.CreateClient(PortForwardRuntime.ProxyHttpClientName);
 			using var responseMessage = await client.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
 			context.Response.StatusCode = (int)responseMessage.StatusCode;
 			CopyResponseHeaders(context, responseMessage);
@@ -95,6 +124,7 @@ public sealed class PortForwardProxyMiddleware(RequestDelegate next, PortForward
 		}
 		finally
 		{
+			ownedClient?.Dispose();
 			Interlocked.Decrement(ref counters.ActiveConnections);
 		}
 	}

@@ -36,7 +36,9 @@ public class PortForwardRule : BaseEntity
 
 	/// <summary>
 	/// 路径转发前缀（可空），如 /mcp。非空时博客收到该路径或其子路径的 HTTP 请求会剥掉此前缀、
-	/// 把剩余路径代理转发到目标主机端口；为空表示不启用路径转发，与 TCP 监听相互独立
+	/// 把剩余路径代理转发到目标主机端口；为空表示不启用路径转发，与 TCP 监听相互独立、并存。
+	/// 内网穿透模式同样适用：请求经隧道代理到客户端所在内网的目标，此时 TargetHost 可留空、
+	/// TargetPort 可为 0，表示使用客户端自己配置的默认目标
 	/// </summary>
 	[MaxLength(128)]
 	public string Path { get; set; }

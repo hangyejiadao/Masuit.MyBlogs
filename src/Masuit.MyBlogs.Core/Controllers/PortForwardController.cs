@@ -200,10 +200,24 @@ return ResultData(null, false, $"监听端口 {cmd.ListenPort} 已被其他规�
 			}
 			if (!string.IsNullOrWhiteSpace(path))
 			{
-				return ResultData(null, false, "内网穿透模式不支持路径转发，请清空路径！");
+				// 穿透模式填了路径即启用路径转发（与监听端口的 TCP 访问并存）：保留规则填写的目标，
+				// 它是客户端所在内网的地址；主机可留空、端口可为 0，都表示用客户端自己配置的默认目标
+				if (cmd.TargetPort is < 0 or > 65535)
+				{
+					return ResultData(null, false, "目标端口必须在 0-65535 之间（0 表示使用客户端默认目标端口）！");
+				}
+				cmd.TargetHost = cmd.TargetHost?.Trim() ?? string.Empty;
+				if (cmd.TargetHost.Length > 256)
+				{
+					return ResultData(null, false, "目标地址长度不能超过 256 个字符！");
+				}
 			}
-			cmd.TargetHost = string.Empty;
-			cmd.TargetPort = 0;
+			else
+			{
+				// 未填路径时只有监听端口访问，目标沿用旧行为清空，客户端按自身配置的默认目标转发
+				cmd.TargetHost = string.Empty;
+				cmd.TargetPort = 0;
+			}
 		}
 
 if (path!= null)

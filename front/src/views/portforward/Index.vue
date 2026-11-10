@@ -46,6 +46,9 @@
         <template v-else>
           <q-input v-model="form.TunnelId" outlined dense label="隧道编号 *" hint="只能包含字母、数字、连字符和下划线" />
           <q-input v-model="form.TunnelToken" outlined dense type="password" label="服务端密钥 *" :hint="form.Id > 0 ? '编辑时留空表示沿用已有密钥；填写新密钥会立即使旧客户端失效' : '新建时必须填写，长度 16-256 个字符'" />
+          <q-input v-model="form.Path" outlined dense label="路径（可选，如 /mcp）" hint="填写后，访问博客该路径的 HTTP 请求会经隧道代理到内网目标，端口和路径两种访问方式同时可用；留空则只有监听端口访问" />
+          <q-input v-model="form.TargetHost" outlined dense label="目标地址（路径转发可选，客户端内网 IP 或主机名）" hint="路径转发时客户端要连接的内网地址；留空表示使用客户端自己配置的默认目标地址" />
+          <q-input v-model.number="form.TargetPort" outlined dense type="number" min="0" max="65535" label="目标端口（路径转发可选）" hint="路径转发时客户端要连接的内网端口；填 0 表示使用客户端自己配置的默认目标端口" />
         </template>
         <div class="row items-center"><span class="q-mr-md">是否启用</span><q-toggle v-model="form.Enabled" dense /></div>
         <q-input v-model="form.Remark" outlined dense type="textarea" rows="2" label="备注" />
@@ -170,7 +173,8 @@ const save = async () => {
     if (!form.value.TunnelId.trim() || !/^[A-Za-z0-9_-]+$/.test(form.value.TunnelId.trim())) { toast.error('隧道编号格式不正确'); return }
     if (form.value.Id === 0 && form.value.TunnelToken.trim().length < 16) { toast.error('新建内网穿透规则必须填写至少 16 个字符的密钥'); return }
     if (form.value.TunnelToken.trim() && (form.value.TunnelToken.trim().length < 16 || form.value.TunnelToken.trim().length > 256)) { toast.error('密钥长度必须在 16-256 个字符之间'); return }
-    form.value.TargetHost = ''; form.value.TargetPort = 0; form.value.Path = ''
+    const path = form.value.Path.trim(); if (path && (!path.startsWith('/') || path.length < 2 || path.length > 128 || path.endsWith('/') || path.includes(' ') || path.includes('..'))) { toast.error('路径格式不正确'); return }; form.value.Path = path
+    if (form.value.TargetPort < 0 || form.value.TargetPort > 65535) { toast.error('目标端口必须在 0-65535 之间（0 表示使用客户端默认目标端口）'); return }
   }
   if (await savePayload(form.value)) { showDialog.value = false; load() }
 }

@@ -224,6 +224,82 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		}
 	}
 
+	/// <summary>
+	/// 为 HTTP 路径代理打开一条隧道字节流：注册待配对连接后通知客户端建立数据通道，
+	/// 客户端连上后把数据 WebSocket 包装成流返回；流释放时摘除待配对连接并通知数据请求收尾。
+	/// 目标只在规则填了真实值时才随 open 消息下发（主机非空才带 targetHost、端口大于 0 才带 targetPort），
+	/// 缺失时客户端回退到自身配置的默认目标；老客户端会忽略这两个字段，不影响兼容性。
+	/// </summary>
+	/// <param name="tunnelId">内网穿透编号。</param>
+	/// <param name="targetHost">规则填写的目标主机（客户端所在内网的地址），可为空。</param>
+	/// <param name="targetPort">规则填写的目标端口，0 表示用客户端默认目标端口。</param>
+	/// <param name="cancellationToken">调用方取消标记（HTTP 请求结束等）。</param>
+	/// <returns>与内网目标服务相连的字节流。</returns>
+	/// <exception cref="InvalidOperationException">客户端离线、数据通道超时或未建立时抛出，由调用方按网关错误处理。</exception>
+	public async Task<Stream> OpenStreamAsync(string tunnelId, string targetHost, int targetPort, CancellationToken cancellationToken)
+	{
+		tunnelId = tunnelId?.Trim() ?? string.Empty;
+		if (tunnelId.Length == 0 || !_sessions.TryGetValue(tunnelId, out var session))
+		{
+			logger.LogWarning("HTTP 路径代理打开隧道流失败：内网客户端未连接，隧道={TunnelId}", tunnelId);
+			throw new InvalidOperationException("内网客户端未连接");
+		}
+		var connectionId = Guid.NewGuid().ToString("N");
+		var pending = new PendingConnection(connectionId, tunnelId, null);
+		if (!_pending.TryAdd(connectionId, pending))
+		{
+			throw new InvalidOperationException("创建转发连接失败");
+		}
+		try
+		{
+			var open = new Dictionary<string, object> { ["type"] = "open", ["connectionId"] = connectionId };
+			if (!string.IsNullOrWhiteSpace(targetHost))
+			{
+				open["targetHost"] = targetHost.Trim();
+			}
+			if (targetPort > 0)
+			{
+				open["targetPort"] = targetPort;
+			}
+			await session.SendAsync(open, cancellationToken);
+			WebSocket? dataSocket = await pending.Socket.Task.WaitAsync(DataConnectionTimeout, cancellationToken);
+			if (dataSocket is null)
+			{
+				throw new InvalidOperationException("内网客户端数据通道未建立");
+			}
+			// 流的生命周期即连接的生命周期：释放时摘除 pending 并完成它，HandleDataAsync 的等待随之结束
+			return new WebSocketStream(dataSocket, () =>
+			{
+				_pending.TryRemove(connectionId, out _);
+				pending.Complete();
+			});
+		}
+		catch (TimeoutException)
+		{
+			logger.LogWarning("内网隧道数据连接超时（HTTP 路径代理），隧道={TunnelId}", tunnelId);
+			_pending.TryRemove(connectionId, out _);
+			pending.Cancel();
+			throw new InvalidOperationException("内网客户端数据通道连接超时");
+		}
+		catch (OperationCanceledException)
+		{
+			_pending.TryRemove(connectionId, out _);
+			pending.Cancel();
+			throw;
+		}
+		catch (Exception exception)
+		{
+			_pending.TryRemove(connectionId, out _);
+			pending.Cancel();
+			if (exception is InvalidOperationException)
+			{
+				throw;
+			}
+			logger.LogWarning(exception, "打开内网隧道流失败，隧道={TunnelId}", tunnelId);
+			throw new InvalidOperationException("内网隧道流打开失败", exception);
+		}
+	}
+
 	private void RemoveSessionIfCurrent(string tunnelId, TunnelSession session)
 	{
 		if (_sessions.TryGetValue(tunnelId, out var current) && ReferenceEquals(current, session))
@@ -468,11 +544,15 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 
 	private sealed record TunnelRule(int RuleId, string TunnelId, string TokenHash, int ListenPort);
 
-	private sealed class PendingConnection(string connectionId, string tunnelId, TcpClient client)
+	private sealed class PendingConnection(string connectionId, string tunnelId, TcpClient? client)
 	{
 		public string ConnectionId { get; } = connectionId;
 		public string TunnelId { get; } = tunnelId;
-		public TcpClient Client { get; } = client;
+
+		/// <summary>
+		/// TCP 入口的公网连接；HTTP 路径入口打开的流连接没有 TCP 连接，为 null
+		/// </summary>
+		public TcpClient? Client { get; } = client;
 		public TaskCompletionSource<WebSocket?> Socket { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 		public TaskCompletionSource<bool> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -495,6 +575,126 @@ public sealed class ReverseTunnelHub(ILogger<ReverseTunnelHub> logger, IOptionsM
 		public void Complete()
 		{
 			Completion.TrySetResult(true);
+		}
+	}
+
+	/// <summary>
+	/// 把一条数据 WebSocket 包装成字节流供 HTTP 路径代理使用：写即发送一个完整的二进制帧，
+	/// 读逐帧返回二进制消息内容并天然处理分片（单帧未读完时下次读继续同一帧，跨帧无感知）。
+	/// 不在此做字节计数：代理中间件已按 HTTP 请求/响应体计量，再计一次会重复。
+	/// 释放时中止并释放 WebSocket，并回调通知摘除待配对连接、完成数据请求等待。
+	/// </summary>
+	/// <param name="socket">已配对的数据 WebSocket，生命周期归本流所有。</param>
+	/// <param name="onDispose">首次释放时执行的收尾回调。</param>
+	private sealed class WebSocketStream(WebSocket socket, Action onDispose) : Stream
+	{
+		private readonly byte[] _receiveBuffer = new byte[64 * 1024];
+		private readonly SemaphoreSlim _sendLock = new(1, 1);
+		private int _receiveOffset;
+		private int _receiveCount;
+		private bool _receiveEnded;
+		private bool _disposed;
+
+		public override bool CanRead => true;
+		public override bool CanWrite => true;
+		public override bool CanSeek => false;
+		public override long Length => throw new NotSupportedException();
+		public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+		public override void Flush()
+		{
+		}
+
+		public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count), CancellationToken.None).AsTask().GetAwaiter().GetResult();
+
+		public override void Write(byte[] buffer, int offset, int count) => WriteAsync(buffer.AsMemory(offset, count), CancellationToken.None).AsTask().GetAwaiter().GetResult();
+
+		public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+		{
+			ThrowIfDisposed();
+			if (buffer.Length == 0)
+			{
+				return 0;
+			}
+			while (true)
+			{
+				if (_receiveCount > 0)
+				{
+					int copied = Math.Min(buffer.Length, _receiveCount);
+					_receiveBuffer.AsMemory(_receiveOffset, copied).CopyTo(buffer);
+					_receiveOffset += copied;
+					_receiveCount -= copied;
+					return copied;
+				}
+				if (_receiveEnded)
+				{
+					return 0;
+				}
+				WebSocketReceiveResult result = await socket.ReceiveAsync(_receiveBuffer, cancellationToken);
+				if (result.MessageType == WebSocketMessageType.Close)
+				{
+					_receiveEnded = true;
+					return 0;
+				}
+				if (result.MessageType != WebSocketMessageType.Binary || result.Count == 0)
+				{
+					// 文本帧与空帧不属于业务字节流，跳过继续接收
+					continue;
+				}
+				_receiveOffset = 0;
+				_receiveCount = result.Count;
+			}
+		}
+
+		public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => await ReadAsync(buffer.AsMemory(offset, count), cancellationToken);
+
+		public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+		{
+			ThrowIfDisposed();
+			await _sendLock.WaitAsync(cancellationToken);
+			try
+			{
+				await socket.SendAsync(buffer, WebSocketMessageType.Binary, true, cancellationToken);
+			}
+			finally
+			{
+				_sendLock.Release();
+			}
+		}
+
+		public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => await WriteAsync(buffer.AsMemory(offset, count), cancellationToken);
+
+		public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+		public override void SetLength(long value) => throw new NotSupportedException();
+
+		protected override void Dispose(bool disposing)
+		{
+			if (!_disposed)
+			{
+				_disposed = true;
+				try
+				{
+					socket.Abort();
+					socket.Dispose();
+				}
+				catch (Exception)
+				{
+					// 连接已断开时释放失败不影响收尾回调执行
+				}
+				onDispose();
+			}
+			base.Dispose(disposing);
+		}
+
+		private void ThrowIfDisposed()
+		{
+			if (_disposed)
+			{
+				throw new ObjectDisposedException(nameof(WebSocketStream));
+			}
 		}
 	}
 

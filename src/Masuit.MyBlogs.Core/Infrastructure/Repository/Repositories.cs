@@ -6,6 +6,8 @@ public sealed partial class CategoryRepository : BaseRepository<Category>, ICate
 
 public sealed partial class DonateRepository : BaseRepository<Donate>, IDonateRepository;
 
+public sealed partial class WeChatMpPushRecordRepository : BaseRepository<WeChatMpPushRecord>, IWeChatMpPushRecordRepository;
+
 public sealed partial class FastShareRepository : BaseRepository<FastShare>, IFastShareRepository;
 
 public sealed partial class InternalMessageRepository : BaseRepository<InternalMessage>, IInternalMessageRepository;

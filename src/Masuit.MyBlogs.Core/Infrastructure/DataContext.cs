@@ -191,6 +191,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
 
     public virtual DbSet<Donate> Donate { get; set; }
 
+    public virtual DbSet<WeChatMpPushRecord> WeChatMpPushRecords { get; set; }
+
     public virtual DbSet<Seminar> Seminar { get; set; }
 
     public virtual DbSet<InternalMessage> InternalMessage { get; set; }

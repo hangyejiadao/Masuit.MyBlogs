@@ -291,6 +291,8 @@ public partial interface ICommentRepository : IBaseRepository<Comment>;
 
 public partial interface IDonateRepository : IBaseRepository<Donate>;
 
+public partial interface IWeChatMpPushRecordRepository : IBaseRepository<WeChatMpPushRecord>;
+
 public partial interface IFastShareRepository : IBaseRepository<FastShare>;
 
 public partial interface IInternalMessageRepository : IBaseRepository<InternalMessage>;

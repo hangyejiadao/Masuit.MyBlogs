@@ -58,6 +58,7 @@ public class Startup
             AppConfig.EnableIPDirect = bool.Parse(configuration[nameof(AppConfig.EnableIPDirect)] ?? "false");
             configuration.Bind("OAuth", AppConfig.OAuth);
             configuration.Bind("Alipay", AppConfig.Alipay);
+            configuration.Bind("WeChatMp", AppConfig.WeChatMp);
             configuration.Bind("Imgbed:Gitlabs", AppConfig.GitlabConfigs);
             configuration.AddToMasuitTools();
         }
@@ -114,6 +115,7 @@ public class Startup
         services.AddSingleton<VedioMetadataCache>();
         services.AddHttpClient("VedioTmdb", client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHttpClient("WeChatMp", client => client.Timeout = TimeSpan.FromSeconds(30)); // 微信公众号 API（文章推送），access_token 与素材上传共用
 		services.AddMailSender(Configuration).AddFirewallReporter(Configuration).AddRequestLogger(Configuration).AddPerfCounterManager(Configuration).AddPortForward();
 		services.Configure<ReverseTunnelOptions>(Configuration.GetSection("ReverseTunnel"));
 		services.AddSingleton<ReverseTunnelHub>();

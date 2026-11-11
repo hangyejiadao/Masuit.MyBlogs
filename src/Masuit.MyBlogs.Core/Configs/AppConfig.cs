@@ -39,4 +39,9 @@ public class AppConfig
     /// 支付宝支付配置（软件购买商店收款用）
     /// </summary>
     public static AlipayConfig Alipay { get; set; } = new();
+
+    /// <summary>
+    /// 微信公众号文章推送配置（博客文章同步到公众号草稿箱 / 发布）
+    /// </summary>
+    public static WeChatMpConfig WeChatMp { get; set; } = new();
 }

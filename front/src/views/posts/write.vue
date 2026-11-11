@@ -167,8 +167,10 @@
             </template>
           </q-select>
         </div><!-- 提交按钮 -->
-        <div class="row items-start">
+        <div class="row items-start q-gutter-sm">
           <q-btn icon="send" type="submit" color="primary" label="发布文章" :loading="loading" @click="submitPost" />
+          <!-- 同步到微信公众号（仅编辑已发布文章时显示；未配置推送时不显示） -->
+          <WeChatMpPushButton v-if="editMode" :post-id="Number(route.query.id)" :post-title="post.Title" show-label />
         </div>
       </div>
     </q-card-section>
@@ -219,6 +221,7 @@ import { toast } from 'vue3-toastify'
 import 'vue3-toastify/dist/index.css'
 import { useUserStore } from '@/store/users'
 import QTagInput from '@/components/QTagInput.vue'
+import WeChatMpPushButton from '@/components/WeChatMpPushButton.vue'
 
 
 const userStore = useUserStore();

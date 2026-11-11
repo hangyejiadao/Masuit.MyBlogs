@@ -1590,6 +1590,58 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Migrations
                     b.ToTable("Variables");
                 });
 
+            modelBuilder.Entity("Masuit.MyBlogs.Core.Models.Entity.WeChatMpPushRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ArticleUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ErrorCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MediaId")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("MsgDataId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PublishId")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("PublishRequested")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("PushStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PushedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WeChatMpPushRecord");
+                });
+
             modelBuilder.Entity("PostHistoryVersionSeminar", b =>
                 {
                     b.Property<int>("PostHistoryVersionId")

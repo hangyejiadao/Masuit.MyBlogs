@@ -123,7 +123,7 @@
             </template>
           </vxe-column>
           <!-- 操作列 -->
-          <vxe-column title="操作" width="180" fixed="right">
+          <vxe-column title="操作" width="210" fixed="right">
             <template #default="{ row }">
               <!-- 审核通过按钮 -->
               <q-btn v-if="row.Status === '审核中'" dense flat size="md" color="positive" icon="check" @click="passPost(row)">
@@ -169,6 +169,8 @@
               <q-btn dense flat size="md" color="info" icon="analytics" @click="showInsight(row)">
                 <q-tooltip class="bg-info">统计信息</q-tooltip>
               </q-btn>
+              <!-- 同步到微信公众号按钮（仅已发表的文章；未配置推送时不显示） -->
+              <WeChatMpPushButton v-if="row.Status === '已发表'" :post-id="row.Id" :post-title="row.Title" />
             </template>
           </vxe-column>
         </vxe-table>
@@ -312,6 +314,7 @@ import dayjs from 'dayjs'
 import * as echarts from 'echarts'
 import api from '@/axios/AxiosConfig'
 import globalConfig from '@/config'
+import WeChatMpPushButton from '@/components/WeChatMpPushButton.vue'
 
 const insightFrame = ref(null)
 const insightSrc = ref('')

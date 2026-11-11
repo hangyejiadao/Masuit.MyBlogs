@@ -2,6 +2,8 @@
 
 public partial interface IDonateService : IBaseService<Donate>;
 
+public partial interface IDonateOrderService : IBaseService<DonateOrder>;
+
 public partial interface IFastShareService : IBaseService<FastShare>;
 
 public partial interface IInternalMessageService : IBaseService<InternalMessage>;

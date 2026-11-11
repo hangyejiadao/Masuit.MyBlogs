@@ -39,6 +39,12 @@ public class AlipayConfig
 	public string NotifyUrl { get; set; }
 
 	/// <summary>
+	/// 打赏当面付的异步通知地址（服务器 POST 回调），留空则按站点域名自动拼 /DonatePay/AlipayNotify；
+	/// 当面付扫码支付只用异步通知确认收款，不需要同步跳转地址
+	/// </summary>
+	public string DonateNotifyUrl { get; set; }
+
+	/// <summary>
 	/// 支付同步跳转地址（用户浏览器跳回），留空则按站点域名自动拼 /Store/Result（支付宝会附带 out_trade_no 等参数）
 	/// </summary>
 	public string ReturnUrl { get; set; }

@@ -5,6 +5,8 @@ namespace Masuit.MyBlogs.Core.Infrastructure.Services;
 
 public sealed partial class DonateService(IBaseRepository<Donate> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<Donate>(repository, searchEngine, searcher), IDonateService;
 
+public sealed partial class DonateOrderService(IBaseRepository<DonateOrder> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<DonateOrder>(repository, searchEngine, searcher), IDonateOrderService;
+
 public sealed partial class FastShareService(IBaseRepository<FastShare> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<FastShare>(repository, searchEngine, searcher), IFastShareService;
 
 public sealed partial class InternalMessageService(IBaseRepository<InternalMessage> repository, ISearchEngine<DataContext> searchEngine, ILuceneIndexSearcher searcher) : BaseService<InternalMessage>(repository, searchEngine, searcher), IInternalMessageService;

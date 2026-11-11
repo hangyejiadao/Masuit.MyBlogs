@@ -214,6 +214,159 @@
         }
       </div>
     </section>
+    <!-- 打赏：支付宝当面付扫码支付（无需登录，扫码在支付宝 App 内完成，不需要域名备案） -->
+    <div class="donate-section" style="text-align:center;margin:28px 0 8px;">
+      <button type="button" class="comment-form-btn" id="donateOpenBtn">☕ 打赏作者</button>
+      <p style="margin:8px 0 0;color:#888;font-size:.92rem;">如果文章对你有帮助，欢迎扫码打赏支持，金额随意</p>
+    </div>
+    <div id="donateModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;width:420px;max-width:92vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:1.15rem;color:#1566b6;">☕ 打赏作者</h3>
+          <button type="button" id="donateCloseBtn" style="border:none;background:none;font-size:1.4rem;color:#999;cursor:pointer;">×</button>
+        </div>
+        <div id="donateStepAmount">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="donateAmountBtns">
+            <button type="button" class="donate-amount-btn" data-amount="1" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥1</button>
+            <button type="button" class="donate-amount-btn" data-amount="5" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥5</button>
+            <button type="button" class="donate-amount-btn" data-amount="10" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥10</button>
+            <button type="button" class="donate-amount-btn" data-amount="20" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥20</button>
+            <button type="button" class="donate-amount-btn" data-amount="50" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥50</button>
+            <button type="button" class="donate-amount-btn" data-amount="100" style="flex:1;min-width:60px;padding:9px 0;border:1px solid #bcd7f5;border-radius:8px;background:#f5f9ff;color:#1566b6;font-size:1rem;cursor:pointer;">¥100</button>
+          </div>
+          <input type="number" id="donateCustomAmount" min="0.01" max="10000" step="0.01" placeholder="自定义金额（0.01-10000 元）" style="width:100%;padding:9px 12px;border:1px solid #bcd7f5;border-radius:8px;margin-bottom:12px;box-sizing:border-box;" />
+          <input type="text" id="donateNickName" maxlength="32" placeholder="昵称（可选，默认“热心网友”）" style="width:100%;padding:9px 12px;border:1px solid #bcd7f5;border-radius:8px;margin-bottom:12px;box-sizing:border-box;" />
+          <input type="text" id="donateMessage" maxlength="200" placeholder="留言（可选，最长 200 字）" style="width:100%;padding:9px 12px;border:1px solid #bcd7f5;border-radius:8px;margin-bottom:12px;box-sizing:border-box;" />
+          <button type="button" class="comment-form-btn" id="donateCreateBtn" style="width:100%;">生成支付二维码</button>
+          <p id="donateError" style="display:none;margin:10px 0 0;color:#d32f2f;font-size:.92rem;"></p>
+        </div>
+        <div id="donateStepQr" style="display:none;text-align:center;">
+          <p style="margin:0 0 8px;font-size:1.05rem;">请用<span style="color:#1677ff;font-weight:600;">支付宝 App</span>扫码支付 <span id="donatePayAmount" style="color:#d32f2f;font-weight:700;"></span></p>
+          <div id="donateQrCode" style="display:flex;justify-content:center;margin:12px 0;"></div>
+          <p style="margin:0 0 4px;color:#888;font-size:.9rem;">订单号：<span id="donateOrderNo"></span></p>
+          <p style="margin:0 0 12px;color:#888;font-size:.9rem;">二维码 <span id="donateCountdown"></span> 后过期，过期请重新下单</p>
+          <p id="donatePayStatus" style="margin:0 0 12px;color:#1566b6;font-size:.95rem;">等待支付…</p>
+          <button type="button" class="comment-form-btn" id="donateBackBtn" style="background:#fff;color:#1566b6;border:1px solid #bcd7f5;">返回重选金额</button>
+        </div>
+        <div id="donateStepSuccess" style="display:none;text-align:center;">
+          <p style="font-size:2.2rem;margin:8px 0 4px;">🎉</p>
+          <p style="margin:0 0 8px;font-size:1.1rem;color:#2e7d32;font-weight:600;">支付成功，感谢打赏！</p>
+          <p style="margin:0 0 16px;color:#888;font-size:.92rem;">打赏 <span id="donateSuccessAmount"></span> 已收到，感谢你的支持</p>
+          <button type="button" class="comment-form-btn" id="donateDoneBtn" style="width:100%;">完成</button>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+      (function () {
+        var selectedAmount = 0, currentOrderNo = '', pollTimer = null, countdownTimer = null, expiresAt = null;
+        function showStep(name) {
+          $('#donateStepAmount').toggle(name === 'amount');
+          $('#donateStepQr').toggle(name === 'qr');
+          $('#donateStepSuccess').toggle(name === 'success');
+        }
+        function stopPolling() {
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        }
+        function openModal() {
+          stopPolling();
+          selectedAmount = 0;
+          $('#donateCustomAmount').val('');
+          $('#donateNickName').val('');
+          $('#donateMessage').val('');
+          $('#donateError').hide();
+          $('.donate-amount-btn').css({ background: '#f5f9ff', color: '#1566b6' });
+          showStep('amount');
+          $('#donateModal').css('display', 'flex');
+        }
+        function closeModal() {
+          stopPolling();
+          $('#donateModal').hide();
+        }
+        $('#donateOpenBtn').on('click', openModal);
+        $('#donateCloseBtn').on('click', closeModal);
+        $('#donateDoneBtn').on('click', closeModal);
+        $('#donateModal').on('click', function (e) { if (e.target === this) closeModal(); });
+        $('#donateBackBtn').on('click', function () { stopPolling(); showStep('amount'); });
+        $('.donate-amount-btn').on('click', function () {
+          selectedAmount = parseFloat($(this).data('amount'));
+          $('#donateCustomAmount').val(selectedAmount);
+          $('.donate-amount-btn').css({ background: '#f5f9ff', color: '#1566b6' });
+          $(this).css({ background: '#1e90ff', color: '#fff' });
+        });
+        $('#donateCustomAmount').on('input', function () {
+          selectedAmount = parseFloat($(this).val()) || 0;
+          $('.donate-amount-btn').css({ background: '#f5f9ff', color: '#1566b6' });
+        });
+        function startCountdown() {
+          if (countdownTimer) clearInterval(countdownTimer);
+          countdownTimer = setInterval(function () {
+            var remain = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+            var h = Math.floor(remain / 3600), m = Math.floor((remain % 3600) / 60), s = remain % 60;
+            $('#donateCountdown').text(h + '小时' + String(m).padStart(2, '0') + '分' + String(s).padStart(2, '0') + '秒');
+            if (remain <= 0) { stopPolling(); $('#donatePayStatus').text('二维码已过期，请返回重选金额重新下单。'); }
+          }, 1000);
+        }
+        function startPolling() {
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = setInterval(function () {
+            $.getJSON('/DonatePay/QueryStatus', { orderNo: currentOrderNo }).done(function (res) {
+              if (!res || !res.Success || !res.Data) return;
+              if (res.Data.OrderStatus === 1) {
+                stopPolling();
+                $('#donateSuccessAmount').text('¥' + Number(res.Data.Amount).toFixed(2));
+                showStep('success');
+              } else if (res.Data.OrderStatus === 2) {
+                stopPolling();
+                $('#donatePayStatus').text('订单已关闭，请返回重选金额重新下单。');
+              }
+            });
+          }, 3000);
+        }
+        $('#donateCreateBtn').on('click', function () {
+          var amount = parseFloat($('#donateCustomAmount').val()) || selectedAmount;
+          if (!amount || amount < 0.01 || amount > 10000) {
+            $('#donateError').text('金额须在 0.01 至 10000 元之间。').show();
+            return;
+          }
+          amount = Math.round(amount * 100) / 100;
+          var btn = $(this);
+          btn.prop('disabled', true).text('生成中…');
+          $('#donateError').hide();
+          $.ajax({
+            url: '/DonatePay/Create',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ amount: amount, nickName: $('#donateNickName').val(), message: $('#donateMessage').val() })
+          }).done(function (res) {
+            btn.prop('disabled', false).text('生成支付二维码');
+            if (!res || !res.Success || !res.Data || !res.Data.QrCode) {
+              $('#donateError').text((res && res.Message) || '生成支付二维码失败，请稍后重试。').show();
+              return;
+            }
+            currentOrderNo = res.Data.OrderNo;
+            expiresAt = new Date(res.Data.ExpiresAt).getTime();
+            $('#donatePayAmount').text('¥' + Number(res.Data.Amount).toFixed(2));
+            $('#donateOrderNo').text(res.Data.OrderNo);
+            $('#donateQrCode').empty();
+            try {
+              new QRCode(document.getElementById('donateQrCode'), { text: res.Data.QrCode, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+            } catch (e) {
+              $('#donateQrCode').html('<p style="color:#d32f2f;">二维码生成失败，请刷新页面重试。</p>');
+              return;
+            }
+            $('#donatePayStatus').text('等待支付…');
+            showStep('qr');
+            startCountdown();
+            startPolling();
+          }).fail(function () {
+            btn.prop('disabled', false).text('生成支付二维码');
+            $('#donateError').text('网络异常，请稍后重试。').show();
+          });
+        });
+      })();
+    </script>
     <section class="comment-section">
       <div class="comment-form">
         <h2 class="comment-list-title" id="comment">评论区</h2>

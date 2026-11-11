@@ -45,6 +45,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         modelBuilder.Entity<AppOrder>().HasOne(e => e.Application).WithMany().HasForeignKey(e => e.ApplicationInfoId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AppOrder>().HasOne(e => e.PricePlan).WithMany().HasForeignKey(e => e.PricePlanId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<AppOrder>().HasOne(e => e.IssuedLicense).WithMany().HasForeignKey(e => e.IssuedLicenseId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<DonateOrder>().HasIndex(e => e.OrderNo).IsUnique();
+        modelBuilder.Entity<DonateOrder>().HasIndex(e => e.CreatedAt).IsDescending();
         modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.ListenPort).IsUnique();
         modelBuilder.Entity<PortForwardRule>().HasIndex(e => e.TunnelId).IsUnique().HasFilter("\"TunnelId\" IS NOT NULL");
         modelBuilder.Entity<BrakeLeaderboardEntry>().HasIndex(e => e.Ip).IsUnique();
@@ -190,6 +192,8 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public virtual DbSet<BrakeLeaderboardEntry> BrakeLeaderboardEntry { get; set; }
 
     public virtual DbSet<Donate> Donate { get; set; }
+
+    public virtual DbSet<DonateOrder> DonateOrder { get; set; }
 
     public virtual DbSet<Seminar> Seminar { get; set; }
 

@@ -275,6 +275,16 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
         component: () => import("@/views/system/settings.vue"),
       },
       {
+        path: "mcp",
+        name: "system-mcp",
+        meta: {
+          roles: ["admin"],
+          title: "MCP 配置",
+          icon: "smart_toy",
+        },
+        component: () => import("@/views/system/mcp.vue"),
+      },
+      {
         path: "vedio",
         name: "system-vedio",
         meta: { roles: ["admin"], title: "影视设置", icon: "movie" },

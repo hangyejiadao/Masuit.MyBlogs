@@ -199,6 +199,7 @@ EF 批量扩展：Z.EntityFramework.Plus 提供高性能批处理；
 如需迁移到其他数据库，可先还原到 PostgreSQL，再使用 [Full Convert](https://masuit.org/2163) 或自定义脚本迁移到目标数据库类型。
 
 数据库结构变更和 EF Core 迁移流程见 [docs/DATABASE_MIGRATIONS.md](docs/DATABASE_MIGRATIONS.md)。
+博客内置 MCP 服务端（供 AI 助手读写文章），端点 `https://你的域名/api/mcp`，接入与客户端配置见 [docs/MCP智能体接入说明.md](docs/MCP智能体接入说明.md)。
 #### 4.修改配置文件：
 主要需要配置的是以下内容，其他配置均为可选项，不配置则表示不启用；
 ![image](https://user-images.githubusercontent.com/20254980/169738528-ba0cc1a4-cb19-4e9d-b6cd-2f146a633c35.png)  

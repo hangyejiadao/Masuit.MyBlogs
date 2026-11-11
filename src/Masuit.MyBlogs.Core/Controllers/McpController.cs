@@ -266,6 +266,18 @@ public sealed class McpController : BaseController
 			},
 			new JsonObject
 			{
+				["name"] = "search_posts",
+				["description"] = "按关键词全文搜索博客文章（标题、关键词、标签与正文），返回 id、标题、摘要、状态、发布时间与链接；只想按标题或分类浏览时用 list_posts。",
+				["inputSchema"] = Schema(new JsonObject
+				{
+					["keyword"] = Prop("string", "搜索关键词，必填；多个词用空格分隔，按任一词匹配"),
+					["status"] = Prop("string", "状态过滤：published（已发布）、draft（草稿/待审核）、takedown（已下架），不传表示全部", ["published", "draft", "takedown"]),
+					["page"] = Prop("integer", "页码，从 1 开始，默认 1"),
+					["pageSize"] = Prop("integer", "每页条数，默认 20，最大 50")
+				}, "keyword")
+			},
+			new JsonObject
+			{
 				["name"] = "get_post",
 				["description"] = "按 id 读取单篇文章全文（标题、内容、内容格式、分类、标签、关键词、状态、发布时间、链接），改稿前先用它读原文。",
 				["inputSchema"] = Schema(new JsonObject
@@ -407,6 +419,7 @@ public sealed class McpController : BaseController
 			{
 				"list_categories" => ListCategories(),
 				"list_posts" => ListPosts(args),
+				"search_posts" => SearchPosts(args),
 				"get_post" => GetPost(args),
 				"list_tags" => ListTags(),
 				"publish_post" => await PublishPostAsync(args, cancellationToken),
@@ -496,6 +509,97 @@ public sealed class McpController : BaseController
 			})
 			.ToList();
 		return new { total, page, pageSize, posts };
+	}
+
+	/// <summary>
+	/// search_posts：按关键词全文搜索文章（标题、关键词、标签、正文），摘要为去 HTML 后的纯文本片段，命中词前后各截一段
+	/// </summary>
+	/// <param name="args">工具参数（keyword 必填，可选 status/page/pageSize）</param>
+	/// <returns>分页结果（total、page、pageSize、posts 数组，含摘要）</returns>
+	private object SearchPosts(JsonElement args)
+	{
+		var keyword = GetString(args, "keyword")?.Trim() ?? throw new McpToolException("缺少参数：keyword");
+		if (keyword.Length == 0)
+		{
+			throw new McpToolException("搜索关键词不能为空");
+		}
+
+		var page = Math.Max(1, GetInt(args, "page") ?? 1);
+		var pageSize = Math.Clamp(GetInt(args, "pageSize") ?? 20, 1, 50);
+		IQueryable<Post> query = PostService.GetQueryNoTracking(p => true).Include(p => p.Category);
+		var words = keyword.Split([' ', '　', ',', '，'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+		if (words.Length == 0)
+		{
+			throw new McpToolException("搜索关键词不能为空");
+		}
+
+		// 任一词命中标题、关键词、标签或正文即算匹配；用表达式树拼接 Or，保证 EF Core 能翻译成 SQL（不能在查询里对本地数组用 Any + 闭包）
+		Expression<Func<Post, bool>> predicate = p => false;
+		foreach (var word in words)
+		{
+			var w = word;
+			predicate = predicate.Or(p => p.Title.Contains(w) || p.Keyword.Contains(w) || p.Label.Contains(w) || p.Content.Contains(w));
+		}
+
+		query = query.Where(predicate);
+		if (GetString(args, "status") is { } statusText)
+		{
+			var status = MapStatus(statusText) ?? throw new McpToolException($"不支持的状态：{statusText}，可用值：published、draft、takedown");
+			query = query.Where(p => p.Status == status);
+		}
+
+		var total = query.Count();
+		var posts = query.OrderByDescending(p => p.PostDate).ThenByDescending(p => p.Id)
+			.Skip((page - 1) * pageSize).Take(pageSize)
+			.ToList()
+			.Select(p => new
+			{
+				id = p.Id,
+				title = p.Title,
+				summary = BuildSummary(p.Content, words),
+				status = StatusToken(p.Status),
+				categoryId = p.CategoryId,
+				categoryName = p.Category?.Name,
+				postDate = p.PostDate.ToString("yyyy-MM-dd HH:mm:ss"),
+				url = PostUrl(p.Id)
+			})
+			.ToList();
+		return new { total, page, pageSize, posts };
+	}
+
+	/// <summary>
+	/// 从正文生成纯文本摘要：去 HTML 标签后，以首个命中词为中心前后各截一段（总长约 200 字）；未命中则取正文前 200 字
+	/// </summary>
+	/// <param name="content">文章正文（HTML 或 Markdown）</param>
+	/// <param name="words">搜索词数组</param>
+	/// <returns>摘要文本</returns>
+	private static string BuildSummary(string content, string[] words)
+	{
+		var plain = (content ?? string.Empty).RemoveHtmlTag().Trim();
+		if (plain.Length == 0)
+		{
+			return string.Empty;
+		}
+
+		var index = -1;
+		foreach (var word in words)
+		{
+			var found = plain.IndexOf(word, StringComparison.OrdinalIgnoreCase);
+			if (found >= 0 && (index < 0 || found < index))
+			{
+				index = found;
+			}
+		}
+
+		if (index < 0)
+		{
+			return plain.Length > 200 ? plain[..200] : plain;
+		}
+
+		var start = Math.Max(0, index - 80);
+		var length = Math.Min(200, plain.Length - start);
+		var summary = plain.Substring(start, length);
+		return start > 0 ? "…" + summary : summary;
 	}
 
 	/// <summary>

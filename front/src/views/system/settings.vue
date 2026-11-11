@@ -204,9 +204,9 @@
         <q-btn dense flat size="sm" label="复制 JSON" @click="copyText(mcpClientConfig)" />
       </div>
       <pre style="background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 12px; margin: 4px 0 0;">{{ mcpClientConfig }}</pre>
-      <div class="text-subtitle2 q-mt-md">可用工具（共 7 个）</div>
+      <div class="text-subtitle2 q-mt-md">可用工具（共 8 个）</div>
       <div class="text-body2">
-        list_categories 查看文章分类 · list_posts 分页查询文章 · get_post 读取文章全文 · list_tags 查看热门标签 · publish_post 发布新文章 · update_post 修改/上下架文章 · upload_image 上传图片到图床
+        list_categories 查看文章分类 · list_posts 分页查询文章 · search_posts 全文搜索文章 · get_post 读取文章全文 · list_tags 查看热门标签 · publish_post 发布新文章 · update_post 修改/上下架文章 · upload_image 上传图片到图床
       </div>
     </q-card-section>
   </q-card>

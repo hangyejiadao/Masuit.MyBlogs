@@ -36,12 +36,19 @@ public sealed class SystemController : AdminController
         [FromServices] LoggerDbContext loggerDbContext,
         [Range(1, int.MaxValue)] int page = 1,
         [Range(1, 100)] int size = 50,
-        bool errorsOnly = false)
+        bool errorsOnly = false,
+        string path = null)
     {
         var query = loggerDbContext.Set<HttpRequestLog>().AsNoTracking();
         if (errorsOnly)
         {
             query = query.Where(log => log.IsException);
+        }
+
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            var keyword = path.Trim();
+            query = query.Where(log => log.Path.Contains(keyword));
         }
 
         var totalCount = await query.CountAsync();

@@ -3,6 +3,11 @@
     <div class="row items-center q-mb-md">
       <div class="text-h4">HTTP 请求日志</div>
       <q-space />
+      <q-input v-model="pathKeyword" dense outlined clearable debounce="500" label="按路径搜索" placeholder="如 /wechat/syncpost" style="min-width: 280px" class="q-mr-md">
+        <template #prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
       <q-toggle v-model="errorsOnly" label="仅显示异常" color="negative" />
       <q-btn flat round icon="refresh" :loading="loading" aria-label="刷新" @click="loadLogs(pagination)" />
     </div>
@@ -150,6 +155,7 @@ const columns = [
 const logs = ref<HttpRequestLog[]>([])
 const loading = ref(false)
 const errorsOnly = ref(false)
+const pathKeyword = ref('')
 const showDetails = ref(false)
 const selectedLog = ref<HttpRequestLog | null>(null)
 const pagination = ref<TablePagination>({
@@ -167,7 +173,8 @@ const loadLogs = async (requestedPagination: TablePagination) => {
       params: {
         page: requestedPagination.page,
         size: requestedPagination.rowsPerPage,
-        errorsOnly: errorsOnly.value
+        errorsOnly: errorsOnly.value,
+        path: pathKeyword.value?.trim() || undefined
       }
     }) as ApiResponse<LogsPage>
 
@@ -201,6 +208,11 @@ const prettyJson = (value: string) => {
 }
 
 watch(errorsOnly, () => {
+  pagination.value.page = 1
+  loadLogs(pagination.value)
+})
+
+watch(pathKeyword, () => {
   pagination.value.page = 1
   loadLogs(pagination.value)
 })

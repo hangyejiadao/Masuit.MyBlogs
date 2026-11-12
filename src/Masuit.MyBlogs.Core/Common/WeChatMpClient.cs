@@ -752,7 +752,10 @@ public sealed class WeChatMpClient
     }
 
     /// <summary>
-    /// 以 multipart 方式上传图片文件并解析响应（表单字段名固定为 media）
+    /// 以 multipart 方式上传图片文件并解析响应（表单字段名固定为 media）。
+    /// 请求体手工拼装而非用 MultipartFormDataContent：.NET 默认给 boundary 加引号、且 boundary 含连字符，
+    /// 微信素材接口的解析器对此兼容性差，会把整个 media 字段丢弃并返回 41005（media data missing）；
+    /// 手工拼装使用纯字母数字 boundary 且不加引号，格式与 curl -F 完全一致
     /// </summary>
     /// <param name="url">请求地址</param>
     /// <param name="bytes">图片字节</param>
@@ -761,12 +764,18 @@ public sealed class WeChatMpClient
     /// <returns>JSON 文档（调用方负责释放）</returns>
     private async Task<JsonDocument> PostMultipartAsync(string url, byte[] bytes, string fileName, CancellationToken cancellationToken)
     {
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(bytes);
         var safeName = SafeUploadFileName(fileName, bytes);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue(ContentTypeOf(safeName));
-        form.Add(fileContent, "media", safeName);
-        using var resp = await _httpClient.PostAsync(url, form, cancellationToken);
+        var boundary = Guid.NewGuid().ToString("N");
+        using var body = new MemoryStream();
+        var header = Encoding.ASCII.GetBytes($"--{boundary}\r\nContent-Disposition: form-data; name=\"media\"; filename=\"{safeName}\"\r\nContent-Type: {ContentTypeOf(safeName)}\r\n\r\n");
+        body.Write(header, 0, header.Length);
+        body.Write(bytes, 0, bytes.Length);
+        var footer = Encoding.ASCII.GetBytes($"\r\n--{boundary}--\r\n");
+        body.Write(footer, 0, footer.Length);
+        body.Position = 0;
+        using var content = new StreamContent(body);
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse($"multipart/form-data; boundary={boundary}");
+        using var resp = await _httpClient.PostAsync(url, content, cancellationToken);
         var text = await resp.Content.ReadAsStringAsync(cancellationToken);
         var doc = JsonDocument.Parse(text);
         if (doc.RootElement.TryGetProperty("errcode", out var err) && err.ValueKind == JsonValueKind.Number && err.GetInt32() != 0)

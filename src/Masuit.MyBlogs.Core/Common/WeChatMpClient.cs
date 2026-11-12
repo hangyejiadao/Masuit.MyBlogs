@@ -360,6 +360,13 @@ public sealed class WeChatMpClient
                 try
                 {
                     (bytes, fileName) = await DownloadImageAsync(candidate, cancellationToken);
+                    if (!IsDecodableImage(bytes))
+                    {
+                        warnings.Add($"封面图来源不是有效图片，已自动尝试下一来源：{candidate}");
+                        bytes = null;
+                        continue;
+                    }
+
                     break;
                 }
                 catch (Exception e)
@@ -375,6 +382,8 @@ public sealed class WeChatMpClient
             }
         }
 
+        (bytes, fileName) = NormalizeCoverImage(bytes, fileName, warnings);
+
         var cacheKey = $"WeChat:Thumb:{Convert.ToHexString(MD5.HashData(bytes))}";
         if (_redis.Get<string>(cacheKey) is { Length: > 0 } cachedMediaId)
         {
@@ -384,6 +393,100 @@ public sealed class WeChatMpClient
         var mediaId = await UploadMaterialImageAsync(config, bytes, fileName, cancellationToken);
         _redis.Set(cacheKey, mediaId);
         return mediaId;
+    }
+
+    /// <summary>
+    /// 判断字节内容是否为可解码的图片（挡住把 HTML 错误页、失效图床响应等非图片内容当封面上传的情况）
+    /// </summary>
+    /// <param name="bytes">待检测字节</param>
+    /// <returns>可解码为图片返回 true</returns>
+    private static bool IsDecodableImage(byte[] bytes)
+    {
+        if (bytes is null || bytes.Length == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var bitmap = SKBitmap.Decode(bytes);
+            return bitmap is not null;
+        }
+        catch (Exception e)
+        {
+            LogManager.Error(e);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 按文件头魔数识别图片格式扩展名（不依赖文件名，避免扩展名与内容不一致）
+    /// </summary>
+    /// <param name="bytes">图片字节</param>
+    /// <returns>扩展名（.jpg/.png/.gif/.bmp/.webp），识别不出返回 null</returns>
+    private static string DetectImageExtension(byte[] bytes)
+    {
+        if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+        {
+            return ".jpg";
+        }
+
+        if (bytes.Length >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+        {
+            return ".png";
+        }
+
+        if (bytes.Length >= 3 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46)
+        {
+            return ".gif";
+        }
+
+        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
+        {
+            return ".bmp";
+        }
+
+        if (bytes.Length >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+        {
+            return ".webp";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 规范化封面图：永久素材封面只接受 JPG/PNG，其他格式（webp/gif/bmp 等）统一转码为 JPG，
+    /// 避免微信以 41005/40005 拒绝素材（正文图床 uploadimg 接受的格式比永久素材更宽松，两者不能等同）
+    /// </summary>
+    /// <param name="bytes">原始封面字节</param>
+    /// <param name="fileName">原始文件名</param>
+    /// <param name="warnings">警告收集列表（发生转码时记录）</param>
+    /// <returns>规范化后的字节与文件名</returns>
+    private static (byte[] Bytes, string FileName) NormalizeCoverImage(byte[] bytes, string fileName, List<string> warnings)
+    {
+        if (DetectImageExtension(bytes) is ".jpg" or ".png")
+        {
+            return (bytes, fileName);
+        }
+
+        try
+        {
+            using var bitmap = SKBitmap.Decode(bytes);
+            if (bitmap is null)
+            {
+                return (bytes, fileName);
+            }
+
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+            warnings.Add("封面原图不是 JPG/PNG 格式，已自动转码为 JPG 后上传");
+            return (data.ToArray(), "cover.jpg");
+        }
+        catch (Exception e)
+        {
+            LogManager.Error(e);
+            return (bytes, fileName);
+        }
     }
 
     /// <summary>
@@ -660,11 +763,46 @@ public sealed class WeChatMpClient
     {
         using var form = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(bytes);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue(ContentTypeOf(fileName));
-        form.Add(fileContent, "media", string.IsNullOrWhiteSpace(fileName) ? "image.jpg" : fileName);
+        var safeName = SafeUploadFileName(fileName, bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(ContentTypeOf(safeName));
+        form.Add(fileContent, "media", safeName);
         using var resp = await _httpClient.PostAsync(url, form, cancellationToken);
         var text = await resp.Content.ReadAsStringAsync(cancellationToken);
-        return JsonDocument.Parse(text);
+        var doc = JsonDocument.Parse(text);
+        if (doc.RootElement.TryGetProperty("errcode", out var err) && err.ValueKind == JsonValueKind.Number && err.GetInt32() != 0)
+        {
+            var endpoint = url.Split('?')[0];
+            var errmsg = doc.RootElement.TryGetProperty("errmsg", out var m) ? m.GetString() : "";
+            LogManager.Error($"微信图片上传失败：接口 {endpoint}，文件名 {safeName}，大小 {bytes.Length} 字节，errcode {err.GetInt32()}：{errmsg}", new WeChatApiException(err.GetInt32(), errmsg));
+        }
+
+        return doc;
+    }
+
+    /// <summary>
+    /// 生成上传用的安全文件名：仅保留 ASCII 文件名，扩展名以图片实际格式为准。
+    /// 微信素材接口对带路径、中文或扩展名与内容不一致的文件名解析严格，会以 41005（media data missing）拒绝
+    /// </summary>
+    /// <param name="fileName">原始文件名</param>
+    /// <param name="bytes">图片字节</param>
+    /// <returns>安全文件名</returns>
+    private static string SafeUploadFileName(string fileName, byte[] bytes)
+    {
+        var ext = DetectImageExtension(bytes);
+        var name = Path.GetFileName(fileName ?? "");
+        if (ext is null)
+        {
+            var originalExt = Path.GetExtension(name)?.ToLowerInvariant();
+            ext = originalExt is ".png" or ".gif" or ".bmp" ? originalExt : ".jpg";
+        }
+
+        var baseName = Path.GetFileNameWithoutExtension(name);
+        if (string.IsNullOrWhiteSpace(baseName) || baseName.Any(c => c > 127 || c is '"' or '\\'))
+        {
+            baseName = "image";
+        }
+
+        return baseName + ext;
     }
 
     /// <summary>

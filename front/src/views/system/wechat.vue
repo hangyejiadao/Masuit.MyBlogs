@@ -31,7 +31,7 @@
             <q-input v-model="settings.Author" label="默认作者" outlined maxlength="8" counter hint="留空使用文章作者；微信侧作者最长 8 个字" :disable="!loaded || saving" />
           </div>
           <div class="col-12 col-md-6">
-            <q-input v-model="settings.DefaultCoverUrl" label="默认封面图地址" outlined hint="文章正文没有图片时用作公众号封面；可填本站相对路径（如 /upload/images/x.jpg）或图片外链" :disable="!loaded || saving" />
+            <q-input v-model="settings.DefaultCoverUrl" label="默认封面图地址" outlined hint="文章正文没有图片时用作公众号封面；可填本站相对路径（如 /upload/images/x.jpg）或图片外链。不填则依次回退使用站点 Logo、系统自动生成的兜底封面，纯文字文章也能同步" :disable="!loaded || saving" />
           </div>
         </div>
         <div class="q-mt-sm">

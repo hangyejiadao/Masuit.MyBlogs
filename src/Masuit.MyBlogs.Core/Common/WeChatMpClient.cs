@@ -329,25 +329,50 @@ public sealed class WeChatMpClient
     }
 
     /// <summary>
-    /// 确定封面永久素材 id：优先正文首图，其次配置的默认封面；按图片内容 MD5 缓存素材 id，避免重复上传永久素材
+    /// 确定封面永久素材 id：优先正文首图；正文无图时依次回退到配置的默认封面、站点 Logo，
+    /// 都不可用时用代码生成一张渐变兜底封面，保证纯文字文章也能同步（公众号草稿必须带封面永久素材）；
+    /// 按图片内容 MD5 缓存素材 id，避免重复上传永久素材
     /// </summary>
     /// <param name="config">公众号配置</param>
     /// <param name="firstImage">正文首图（可为默认元组）</param>
-    /// <param name="warnings">警告收集列表（预留）</param>
+    /// <param name="warnings">警告收集列表（封面来源加载失败时记录）</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>封面 thumb_media_id</returns>
-    /// <exception cref="WeChatApiException">无任何可用封面图时抛出</exception>
     private async Task<string> ResolveThumbMediaIdAsync(WeChatConfiguration config, (byte[] Bytes, string FileName) firstImage, List<string> warnings, CancellationToken cancellationToken)
     {
         var (bytes, fileName) = firstImage;
         if (bytes is null)
         {
-            if (string.IsNullOrWhiteSpace(config.DefaultCoverUrl))
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(config.DefaultCoverUrl))
             {
-                throw new WeChatApiException(-1, "文章正文没有图片，无法确定公众号封面：请在正文中插入一张图片，或在「公众号配置」页设置默认封面图");
+                candidates.Add(config.DefaultCoverUrl.Trim());
             }
 
-            (bytes, fileName) = await DownloadImageAsync(config.DefaultCoverUrl, cancellationToken);
+            var logo = CommonHelper.SystemSettings.GetOrAdd("logo", "")?.Trim();
+            if (!string.IsNullOrWhiteSpace(logo) && !candidates.Contains(logo, StringComparer.OrdinalIgnoreCase))
+            {
+                candidates.Add(logo);
+            }
+
+            foreach (var candidate in candidates)
+            {
+                try
+                {
+                    (bytes, fileName) = await DownloadImageAsync(candidate, cancellationToken);
+                    break;
+                }
+                catch (Exception e)
+                {
+                    LogManager.Error(e);
+                    warnings.Add($"封面图来源加载失败，已自动尝试下一来源：{candidate}（{e.Message}）");
+                }
+            }
+
+            if (bytes is null)
+            {
+                (bytes, fileName) = GenerateDefaultCover();
+            }
         }
 
         var cacheKey = $"WeChat:Thumb:{Convert.ToHexString(MD5.HashData(bytes))}";
@@ -359,6 +384,63 @@ public sealed class WeChatMpClient
         var mediaId = await UploadMaterialImageAsync(config, bytes, fileName, cancellationToken);
         _redis.Set(cacheKey, mediaId);
         return mediaId;
+    }
+
+    /// <summary>
+    /// 生成兜底封面图（900×383，与公众号大图封面尺寸一致）：深蓝渐变背景加装饰圆与站点域名文字，JPEG 编码。
+    /// 字体不可用时跳过文字只保留图形，保证任何环境下都能产出一张可用封面
+    /// </summary>
+    /// <returns>封面图字节与文件名</returns>
+    private static (byte[] Bytes, string FileName) GenerateDefaultCover()
+    {
+        const int width = 900;
+        const int height = 383;
+        using var bitmap = new SKBitmap(new SKImageInfo(width, height));
+        using var canvas = new SKCanvas(bitmap);
+        using (var gradientPaint = new SKPaint { Shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(width, height), [SKColor.Parse("0D2A56"), SKColor.Parse("10588C")], null, SKShaderTileMode.Clamp) })
+        {
+            canvas.DrawRect(SKRect.Create(width, height), gradientPaint);
+        }
+
+        using (var circlePaint = new SKPaint { Color = new SKColor(255, 255, 255, 26), IsAntialias = true })
+        {
+            canvas.DrawCircle(790, 60, 150, circlePaint);
+            canvas.DrawCircle(850, 300, 110, circlePaint);
+        }
+
+        using (var circlePaint = new SKPaint { Color = new SKColor(255, 255, 255, 18), IsAntialias = true })
+        {
+            canvas.DrawCircle(80, 340, 130, circlePaint);
+        }
+
+        using (var accentPaint = new SKPaint { Color = SKColor.Parse("40BEDC"), IsAntialias = true })
+        {
+            canvas.DrawRect(SKRect.Create(64, 236, 86, 8), accentPaint);
+        }
+
+        try
+        {
+            var domain = CommonHelper.SystemSettings.GetOrAdd("Domain", "")?.Trim();
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                domain = "hangyejiadao.vip";
+            }
+
+            using var titleFont = new SKFont(SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold), 54);
+            using var titlePaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+            canvas.DrawText(domain, 64, 205, SKTextAlign.Left, titleFont, titlePaint);
+            using var subFont = new SKFont(SKTypeface.FromFamilyName("Arial"), 30);
+            using var subPaint = new SKPaint { Color = new SKColor(190, 220, 240), IsAntialias = true };
+            canvas.DrawText("Tech Blog", 66, 285, SKTextAlign.Left, subFont, subPaint);
+        }
+        catch (Exception e)
+        {
+            LogManager.Error(e);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 88);
+        return (data.ToArray(), "wechat-default-cover.jpg");
     }
 
     /// <summary>

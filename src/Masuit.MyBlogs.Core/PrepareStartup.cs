@@ -171,6 +171,7 @@ namespace Masuit.MyBlogs.Core
                 return handler;
             }); //注入HttpClient
             services.AddHttpClient<ImagebedClient>().AddTransientHttpErrorPolicy(builder => builder.Or<TaskCanceledException>().Or<OperationCanceledException>().Or<TimeoutException>().OrResult(res => !res.IsSuccessStatusCode).RetryAsync(3)); //注入HttpClient
+            services.AddHttpClient<WeChatMpClient>(client => client.Timeout = TimeSpan.FromSeconds(120)); //微信公众号客户端：含图片下载/上传，不挂自动重试（避免草稿重复创建）
             return services;
         }
 

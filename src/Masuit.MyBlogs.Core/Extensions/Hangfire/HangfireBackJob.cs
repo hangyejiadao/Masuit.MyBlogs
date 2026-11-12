@@ -98,6 +98,61 @@ public sealed class HangfireBackJob : Disposable, IHangfireBackJob
     }
 
     /// <summary>
+    /// 将文章同步到微信公众号（公众号配置开启自动同步时由发文/编辑路径排入）：
+    /// 同步结果记入 Redis 供后台列表展示；失败只记日志与同步记录，不影响发文流程
+    /// </summary>
+    /// <param name="postId">文章 id</param>
+    public async Task SyncPostToWeChat(int postId)
+    {
+        var config = WeChatConfiguration.Read(name => CommonHelper.SystemSettings[name]);
+        if (!config.Enabled || !config.HasCredentials)
+        {
+            return;
+        }
+
+        var postService = _serviceScope.ServiceProvider.GetRequiredService<IPostService>();
+        var post = postService.GetById(postId);
+        if (post is null || post.Status != Status.Published)
+        {
+            return;
+        }
+
+        var record = WeChatSyncStore.Get(_redisClient, postId);
+        try
+        {
+            var client = _serviceScope.ServiceProvider.GetRequiredService<WeChatMpClient>();
+            var domain = CommonHelper.SystemSettings.GetOrAdd("Domain", "").Split('|').FirstOrDefault()?.Trim();
+            var sourceUrl = string.IsNullOrWhiteSpace(domain) ? "" : $"https://{domain}/{postId}";
+            var result = await client.SyncPostAsync(post, config, sourceUrl, config.AutoPublish, record?.Status == "failed" ? null : record?.MediaId, default);
+            WeChatSyncStore.Save(_redisClient, new WeChatSyncRecord
+            {
+                PostId = postId,
+                MediaId = result.MediaId,
+                PublishId = result.PublishId,
+                Status = result.Published ? "published" : "draft",
+                SyncTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                PostModifyDate = post.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                Message = result.Warnings.Count > 0 ? string.Join("；", result.Warnings) : ""
+            });
+            LogManager.Info($"公众号自动同步完成：文章 {postId}《{post.Title}》，状态 {(result.Published ? "已发布" : "草稿")}");
+        }
+        catch (Exception e)
+        {
+            LogManager.Error(e);
+            WeChatSyncStore.Save(_redisClient, new WeChatSyncRecord
+            {
+                PostId = postId,
+                MediaId = record?.MediaId,
+                PublishId = record?.PublishId,
+                Status = "failed",
+                SyncTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                PostModifyDate = post.ModifyDate.ToString("yyyy-MM-dd HH:mm:ss"),
+                Message = e.Message
+            });
+        }
+    }
+
+    /// <summary>
     /// 登录记录
     /// </summary>
     /// <param name="userInfo"></param>

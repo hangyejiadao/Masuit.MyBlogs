@@ -285,6 +285,16 @@ const asyncRoutesChildren: AsyncRouteRecord[] = [
         component: () => import("@/views/system/mcp.vue"),
       },
       {
+        path: "wechat",
+        name: "system-wechat",
+        meta: {
+          roles: ["admin"],
+          title: "公众号配置",
+          icon: "forum",
+        },
+        component: () => import("@/views/system/wechat.vue"),
+      },
+      {
         path: "vedio",
         name: "system-vedio",
         meta: { roles: ["admin"], title: "影视设置", icon: "movie" },

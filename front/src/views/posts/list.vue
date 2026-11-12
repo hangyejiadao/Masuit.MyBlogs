@@ -123,7 +123,7 @@
             </template>
           </vxe-column>
           <!-- 操作列 -->
-          <vxe-column title="操作" width="180" fixed="right">
+          <vxe-column title="操作" width="215" fixed="right">
             <template #default="{ row }">
               <!-- 审核通过按钮 -->
               <q-btn v-if="row.Status === '审核中'" dense flat size="md" color="positive" icon="check" @click="passPost(row)">
@@ -168,6 +168,10 @@
               <!-- 统计按钮 -->
               <q-btn dense flat size="md" color="info" icon="analytics" @click="showInsight(row)">
                 <q-tooltip class="bg-info">统计信息</q-tooltip>
+              </q-btn>
+              <!-- 公众号同步按钮 -->
+              <q-btn v-if="row.Status === '已发表'" dense flat size="md" :color="wechatBtnColor(row)" icon="send" @click="openWeChatSync(row)">
+                <q-tooltip class="bg-teal">{{ wechatBtnTip(row) }}</q-tooltip>
               </q-btn>
             </template>
           </vxe-column>
@@ -300,6 +304,31 @@
       </q-bar>
       <q-card-actions>
         <iframe ref="insightFrame" :src="insightSrc" width="100%" frameborder="0" scrolling="yes" @load="handleIframeLoad"></iframe>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+  <!-- 公众号同步对话框 -->
+  <q-dialog v-model="showWeChatDialog">
+    <q-card style="min-width: 420px; max-width: 560px">
+      <q-card-section>
+        <div class="text-h6">同步到微信公众号</div>
+        <div class="text-subtitle2 q-mt-sm">《{{ wechatTarget?.Title }}》</div>
+        <div class="text-body2 q-mt-sm" v-if="wechatStatusOf(wechatTarget)">
+          当前状态：
+          <span v-if="wechatStatusOf(wechatTarget).Status === 'published'">已发布</span>
+          <span v-else-if="wechatStatusOf(wechatTarget).Status === 'draft'">已同步到草稿箱</span>
+          <span v-else class="text-negative">上次同步失败</span>
+          <span class="text-grey">（{{ wechatStatusOf(wechatTarget).SyncTime }}）</span>
+          <div class="text-orange" v-if="wechatStatusOf(wechatTarget).Outdated">文章在同步后又有修改，建议重新同步。</div>
+          <div class="text-negative" v-if="wechatStatusOf(wechatTarget).Message">{{ wechatStatusOf(wechatTarget).Message }}</div>
+        </div>
+        <div class="text-body2 q-mt-sm" v-else>这篇文章还没有同步到公众号。</div>
+        <div class="text-caption text-grey q-mt-sm">同步的是已保存的文章版本；正文图片会自动转存到微信图床，封面取正文第一张图。再次同步会更新原草稿，不会重复创建。</div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="取消" color="grey" v-close-popup :disable="wechatSyncing" />
+        <q-btn label="同步到草稿箱" color="teal" :loading="wechatSyncing" @click="syncToWeChat(false)" />
+        <q-btn label="同步并发布" color="primary" :loading="wechatSyncing" @click="syncToWeChat(true)" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -440,6 +469,7 @@ const loadPageData = async () => {
     if (data) {
       tableData.value = data?.Data || []
       pagination.value.total = data?.TotalCount || 0
+      loadWeChatStatuses()
       localStorage.setItem('postlist-params', JSON.stringify(params))
       setTimeout(() => {
         document.querySelector('.vxe-table--body').scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -450,6 +480,70 @@ const loadPageData = async () => {
     toast.error('加载数据失败', { autoClose: 2000, position: 'top-center' })
   } finally {
     loading.value = false
+  }
+}
+
+// ================= 公众号同步 =================
+const wechatStatuses = ref({})
+const showWeChatDialog = ref(false)
+const wechatTarget = ref(null)
+const wechatSyncing = ref(false)
+
+// 批量加载当前页文章的公众号同步状态
+const loadWeChatStatuses = async () => {
+  const ids = tableData.value.map(r => r.Id)
+  if (!ids.length) {
+    wechatStatuses.value = {}
+    return
+  }
+  try {
+    const data = await api.post('/wechat/syncstatuses', { PostIds: ids })
+    wechatStatuses.value = data?.Data || {}
+  } catch {
+    wechatStatuses.value = {}
+  }
+}
+
+const wechatStatusOf = (row) => row ? wechatStatuses.value[row.Id] : null
+
+const wechatBtnColor = (row) => {
+  const s = wechatStatusOf(row)
+  if (!s) return 'grey-7'
+  if (s.Status === 'failed') return 'negative'
+  if (s.Status === 'published') return 'positive'
+  return 'teal'
+}
+
+const wechatBtnTip = (row) => {
+  const s = wechatStatusOf(row)
+  if (!s) return '公众号同步：未同步'
+  if (s.Status === 'failed') return '公众号同步：上次失败，点击重试'
+  if (s.Status === 'published') return `公众号：已发布（${s.SyncTime}）${s.Outdated ? '，文章已修改' : ''}`
+  return `公众号：已同步到草稿箱（${s.SyncTime}）${s.Outdated ? '，文章已修改' : ''}`
+}
+
+const openWeChatSync = (row) => {
+  wechatTarget.value = row
+  showWeChatDialog.value = true
+}
+
+const syncToWeChat = async (publish) => {
+  if (!wechatTarget.value) return
+  wechatSyncing.value = true
+  try {
+    const data = await api.post('/wechat/syncpost', { PostId: wechatTarget.value.Id, Publish: publish })
+    if (data?.Success) {
+      toast.success(data.Message || '同步成功', { autoClose: 3000, position: 'top-center' })
+      showWeChatDialog.value = false
+      loadWeChatStatuses()
+    } else {
+      toast.error(data?.Message || '同步失败', { autoClose: 6000, position: 'top-center' })
+    }
+  } catch (error) {
+    console.error('公众号同步失败:', error)
+    toast.error('同步失败，请重试', { autoClose: 3000, position: 'top-center' })
+  } finally {
+    wechatSyncing.value = false
   }
 }
 

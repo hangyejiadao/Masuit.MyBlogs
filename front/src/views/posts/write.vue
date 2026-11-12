@@ -167,8 +167,9 @@
             </template>
           </q-select>
         </div><!-- 提交按钮 -->
-        <div class="row items-start">
+        <div class="row items-start q-gutter-sm">
           <q-btn icon="send" type="submit" color="primary" label="发布文章" :loading="loading" @click="submitPost" />
+          <q-btn v-if="editMode" icon="share" color="teal" label="同步到公众号" @click="showWeChatDialog = true" />
         </div>
       </div>
     </q-card-section>
@@ -202,6 +203,20 @@
       <q-card-actions align="right">
         <q-btn flat label="取消" color="grey" v-close-popup @click="startDraftTimer" />
         <q-btn label="加载" color="primary" @click="loadDraft" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+  <!-- 公众号同步对话框 -->
+  <q-dialog v-model="showWeChatDialog">
+    <q-card style="min-width: 420px; max-width: 560px">
+      <q-card-section>
+        <div class="text-h6">同步到微信公众号</div>
+        <div class="text-body2 q-mt-sm">将同步<b>已保存</b>的文章版本，未保存的修改请先点「发布文章」保存后再同步。正文图片会自动转存到微信图床，封面取正文第一张图；再次同步会更新原草稿。</div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="取消" color="grey" v-close-popup :disable="wechatSyncing" />
+        <q-btn label="同步到草稿箱" color="teal" :loading="wechatSyncing" @click="syncToWeChat(false)" />
+        <q-btn label="同步并发布" color="primary" :loading="wechatSyncing" @click="syncToWeChat(true)" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -604,6 +619,29 @@ const submitPost = async () => {
     toast.error('提交失败，请重试', { position: "top-center", autoClose: 3000 })
   } finally {
     loading.value = false
+  }
+}
+
+// ================= 公众号同步 =================
+const showWeChatDialog = ref(false)
+const wechatSyncing = ref(false)
+
+// 同步当前文章到公众号（publish=true 时同步后直接发布）
+const syncToWeChat = async (publish: boolean) => {
+  wechatSyncing.value = true
+  try {
+    const response = await PostApi.syncToWeChat(post.Id, publish)
+    if (response?.Success) {
+      toast.success(response.Message || '同步成功', { position: "top-center", autoClose: 3000 })
+      showWeChatDialog.value = false
+    } else {
+      toast.error(response?.Message || '同步失败', { position: "top-center", autoClose: 6000 })
+    }
+  } catch (error) {
+    console.error('公众号同步失败:', error)
+    toast.error('同步失败，请重试', { position: "top-center", autoClose: 3000 })
+  } finally {
+    wechatSyncing.value = false
   }
 }
 

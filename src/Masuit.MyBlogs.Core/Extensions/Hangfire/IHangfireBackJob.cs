@@ -71,4 +71,10 @@ public interface IHangfireBackJob
 	/// 检查授权到期情况，在到期前 30/15/7/1 天及到期当天给客户发送提醒邮件
 	/// </summary>
 	Task SendLicenseExpiryReminders();
+
+	/// <summary>
+	/// 将文章同步到微信公众号草稿箱（公众号配置开启自动同步时由发文/编辑路径排入）
+	/// </summary>
+	/// <param name="postId">文章 id</param>
+	Task SyncPostToWeChat(int postId);
 }

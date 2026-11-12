@@ -857,7 +857,21 @@ public sealed class PostController : BaseController
         {
             SearchEngine.LuceneIndexer.Delete(post);
         }
+        EnqueueWeChatAutoSync(post.Id);
         return ResultData(post.ToDto(), message: "文章修改成功！");
+    }
+
+    /// <summary>
+    /// 公众号配置开启了「自动同步」时，把文章同步到公众号草稿箱排入 Hangfire 后台任务（失败不影响发文结果）
+    /// </summary>
+    /// <param name="postId">文章 id</param>
+    private static void EnqueueWeChatAutoSync(int postId)
+    {
+        var config = WeChatConfiguration.Read(name => CommonHelper.SystemSettings[name]);
+        if (config is { Enabled: true, AutoSync: true, HasCredentials: true })
+        {
+            BackgroundJob.Enqueue<IHangfireBackJob>(job => job.SyncPostToWeChat(postId));
+        }
     }
 
     /// <summary>
@@ -927,6 +941,7 @@ public sealed class PostController : BaseController
             SearchEngine.LuceneIndexer.Delete(post);
         }
 
+        EnqueueWeChatAutoSync(post.Id);
         return ResultData(null, true, "文章发表成功！");
     }
 

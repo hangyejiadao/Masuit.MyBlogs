@@ -140,6 +140,14 @@ export class PostApi {
   }
 
   /**
+   * 同步文章到微信公众号（草稿箱或直接发布）
+   */
+  static async syncToWeChat(postId: number, publish: boolean): Promise<ApiResponse> {
+    const response = await api.post('/wechat/syncpost', { PostId: postId, Publish: publish })
+    return response
+  }
+
+  /**
    * 获取地区列表
    */
   static async getRegions(name: string = 'Regions'): Promise<ApiResponse<string[]>> {

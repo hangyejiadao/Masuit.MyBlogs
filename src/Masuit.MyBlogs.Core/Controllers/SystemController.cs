@@ -178,7 +178,7 @@ public sealed class SystemController : AdminController
     /// <returns></returns>
     public ActionResult GetSettings()
     {
-        var list = CommonHelper.SystemSettings.Where(s => !s.Key.Item.StartsWith(VedioConfiguration.Prefix, StringComparison.Ordinal)).Select(s => new
+        var list = CommonHelper.SystemSettings.Where(s => !s.Key.Item.StartsWith(VedioConfiguration.Prefix, StringComparison.Ordinal) && !s.Key.Item.StartsWith(WeChatConfiguration.Prefix, StringComparison.Ordinal)).Select(s => new
         {
             Name = s.Key.Item,
             s.Value
@@ -195,6 +195,8 @@ public sealed class SystemController : AdminController
     {
         if (settings.Any(item => item.Name?.StartsWith(VedioConfiguration.Prefix, StringComparison.OrdinalIgnoreCase) == true))
             return ResultData(null, false, "影视配置请在影视设置页面保存。");
+        if (settings.Any(item => item.Name?.StartsWith(WeChatConfiguration.Prefix, StringComparison.OrdinalIgnoreCase) == true))
+            return ResultData(null, false, "公众号配置请在公众号配置页面保存。");
         var b = await SystemSettingService.AddOrUpdateSavedAsync(s => s.Name, settings) > 0;
         foreach (var item in settings)
         {

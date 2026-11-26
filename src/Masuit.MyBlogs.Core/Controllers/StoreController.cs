@@ -21,6 +21,12 @@ public sealed class StoreController : BaseController
 	private const string OrderRemarkPrefix = "在线购买，订单号 ";
 
 	/// <summary>
+	/// 订单号里表示「在线续费」的授权备注标记，顺延已有授权时追加到其备注中，
+	/// 通知重试时靠它找回已被本订单顺延过的授权，保证不重复顺延
+	/// </summary>
+	private const string RenewRemarkPrefix = "在线续费，订单号 ";
+
+	/// <summary>
 	/// 应用服务
 	/// </summary>
 	public IApplicationInfoService ApplicationInfoService { get; set; }
@@ -67,6 +73,12 @@ public sealed class StoreController : BaseController
 		var app = ApplicationInfoService.GetQuery(a => a.Id == id && a.Status == Status.Available).Include(a => a.PricePlans).Include(a => a.Versions).FirstOrDefault() ?? throw new NotFoundException("应用不存在或已下架！");
 		ViewBag.Plans = app.PricePlans.Where(p => p.Status == Status.Available).OrderBy(p => p.Sort).ThenBy(p => p.Id).ToList();
 		ViewBag.Versions = app.Versions.Where(v => v.Status == Status.Available).OrderBy(v => v.Sort).ThenByDescending(v => v.Id).ToList();
+		if (CurrentUser.Id > 0)
+		{
+			// 已登录且已持有该应用授权时查出到期最晚的那条，供页面提示「购买即为现有授权续费」并预览续费后到期日
+			ViewBag.MyLicense = AppLicenseService.GetQuery(l => l.UserInfoId == CurrentUser.Id && l.ApplicationInfoId == id && l.Status == Status.Available).OrderByDescending(l => l.ExpireDate).FirstOrDefault();
+		}
+
 		return View(app);
 	}
 
@@ -271,9 +283,12 @@ public sealed class StoreController : BaseController
 	}
 
 	/// <summary>
-	/// 把一笔已确认收款的订单置为已支付并自动发放授权；授权口径与后台签发一致：
-	/// 成交价取订单快照、生效日为今天、到期日 = 生效日 + 方案天数（永久按 +100 年落库），
-	/// 授权备注写入订单号；若此前已发过但未回填（异常中断后重试），按备注找回那条授权回填，不重复发放。
+	/// 把一笔已确认收款的订单置为已支付并履约，履约口径分两种：
+	/// 该用户对该应用已有可用授权时不再新发，而是把方案天数顺延到到期最晚的那条授权上
+	/// （未过期从原到期日顺延、已过期从今天起算，与后台续期同口径；永久方案把到期日置为今天 +100 年），
+	/// 并重置到期提醒档位，授权码与账号绑定不变，顺延来源以续费标记追加进授权备注；
+	/// 没有已有授权时才新建：成交价取订单快照、生效日为今天、到期日 = 生效日 + 方案天数（永久按 +100 年落库），授权备注写入订单号。
+	/// 若此前已履约但订单未回填（异常中断后重试），新建的按订单备注找回、顺延的按备注中的续费标记找回，不重复履约。
 	/// </summary>
 	/// <param name="order">待履约的订单（待支付状态）</param>
 	/// <param name="tradeNo">支付宝交易号</param>
@@ -281,27 +296,50 @@ public sealed class StoreController : BaseController
 	private void MarkPaidAndIssueLicense(AppOrder order, string tradeNo, DateTime paidAt)
 	{
 		var remark = OrderRemarkPrefix + order.OrderNo;
+		var renewRemark = RenewRemarkPrefix + order.OrderNo;
 		var license = order.IssuedLicenseId.HasValue
 			? AppLicenseService.GetById(order.IssuedLicenseId.Value)
-			: AppLicenseService.GetQuery(l => l.Remark == remark).FirstOrDefault();
+			: AppLicenseService.GetQuery(l => l.Remark == remark).FirstOrDefault()
+				?? AppLicenseService.GetQuery(l => l.UserInfoId == order.UserInfoId && l.ApplicationInfoId == order.ApplicationInfoId && l.Remark != null && l.Remark.Contains(renewRemark)).FirstOrDefault();
 		if (license == null)
 		{
-			var user = UserInfoService.GetById(order.UserInfoId) ?? throw new InvalidOperationException("订单用户不存在");
-			var startDate = DateTime.Today;
-			var expireDate = order.PlanValidityDays > 0 ? startDate.AddDays(order.PlanValidityDays) : startDate.AddYears(100);
-			license = AppLicenseService.AddEntitySaved(new AppLicense
+			var existing = AppLicenseService.GetQuery(l => l.UserInfoId == order.UserInfoId && l.ApplicationInfoId == order.ApplicationInfoId && l.Status == Status.Available).OrderByDescending(l => l.ExpireDate).FirstOrDefault();
+			if (existing != null)
 			{
-				ApplicationInfoId = order.ApplicationInfoId,
-				UserInfoId = order.UserInfoId,
-				PricePlanId = order.PricePlanId,
-				PaidPrice = order.PlanPrice,
-				LicenseKey = GenerateUniqueLicenseKey(user),
-				StartDate = startDate,
-				ExpireDate = expireDate,
-				Remark = remark,
-				Status = Status.Available,
-				LastReminderStage = -1
-			});
+				license = existing;
+				var baseDate = license.ExpireDate.Date > DateTime.Today ? license.ExpireDate.Date : DateTime.Today;
+				license.ExpireDate = order.PlanValidityDays > 0 ? baseDate.AddDays(order.PlanValidityDays) : DateTime.Today.AddYears(100);
+				license.LastReminderStage = -1;
+				if (license.Remark == null || !license.Remark.Contains(renewRemark))
+				{
+					var merged = string.IsNullOrWhiteSpace(license.Remark) ? renewRemark : license.Remark + "；" + renewRemark;
+					if (merged.Length <= 512)
+					{
+						license.Remark = merged;
+					}
+				}
+
+				AppLicenseService.SaveChanges();
+			}
+			else
+			{
+				var user = UserInfoService.GetById(order.UserInfoId) ?? throw new InvalidOperationException("订单用户不存在");
+				var startDate = DateTime.Today;
+				var expireDate = order.PlanValidityDays > 0 ? startDate.AddDays(order.PlanValidityDays) : startDate.AddYears(100);
+				license = AppLicenseService.AddEntitySaved(new AppLicense
+				{
+					ApplicationInfoId = order.ApplicationInfoId,
+					UserInfoId = order.UserInfoId,
+					PricePlanId = order.PricePlanId,
+					PaidPrice = order.PlanPrice,
+					LicenseKey = GenerateUniqueLicenseKey(user),
+					StartDate = startDate,
+					ExpireDate = expireDate,
+					Remark = remark,
+					Status = Status.Available,
+					LastReminderStage = -1
+				});
+			}
 		}
 
 		order.IssuedLicenseId = license.Id;

@@ -1,4 +1,5 @@
 @using Masuit.MyBlogs.Core.Models.Entity
+@using Masuit.MyBlogs.Core.Models.Enum
 @model List<AppLicense>
 @{
   ViewBag.Title = "已购 License 管理";
@@ -25,6 +26,18 @@
     white-space: nowrap;
   }
   .copy-btn:hover { background: #e3eef8; }
+  .renew-btn {
+    display: inline-block;
+    padding: 3px 12px;
+    border: 1px solid #1566b6;
+    border-radius: 5px;
+    background: #1566b6;
+    color: #fff;
+    font-size: .85rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .renew-btn:hover { background: #0f5294; color: #fff; }
   .lic-valid { color: #27632a; font-weight: 600; }
   .lic-expired { color: #c0392b; font-weight: 600; }
   .store-empty { color: #888; padding: 30px 0; }
@@ -47,6 +60,7 @@ else
         <th>生效时间</th>
         <th>到期时间</th>
         <th>状态</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody>
@@ -70,6 +84,16 @@ else
             else
             {
               <span class="lic-valid">有效</span>
+            }
+          </td>
+          <td>
+            @if (!IsPermanent(license) && license.Application != null && license.Application.Status == Status.Available)
+            {
+              <a class="renew-btn" href="/Store/Detail/@license.ApplicationInfoId">续费延期</a>
+            }
+            else
+            {
+              <span>-</span>
             }
           </td>
         </tr>

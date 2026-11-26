@@ -10,6 +10,9 @@
   var versions = ViewBag.Versions as List<AppVersion> ?? new List<AppVersion>();
   var currentUser = Context.Session.Get<UserInfoDto>(SessionKey.UserInfo);
   string ValidityText(int days) => days > 0 ? days + " 天" : "永久";
+  var myLicense = ViewBag.MyLicense as AppLicense;
+  var myPermanent = myLicense != null && myLicense.ExpireDate >= myLicense.StartDate.AddYears(99);
+  var renewBase = myLicense == null ? DateTime.Today : (myLicense.ExpireDate.Date > DateTime.Today ? myLicense.ExpireDate.Date : DateTime.Today);
 }
 <style>
   .store-head { margin: 16px 0 6px; }
@@ -26,6 +29,8 @@
   .store-btn { padding: 10px 28px; border: none; border-radius: 6px; background: #1566b6; color: #fff; cursor: pointer; font-size: 1rem; }
   .store-btn:hover { background: #0f5294; }
   .store-alert { border: 1px solid #f0c36d; background: #fdf6e3; color: #7a5b12; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .store-owned { border: 1px solid #bfe3c0; background: #f0f9f0; color: #27632a; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .store-renew { font-size: 1.02rem; margin: 0 0 14px; color: #27632a; }
   .store-ver { border-bottom: 1px solid #eef2f6; padding: 8px 0; }
   .store-ver .vlog { color: #666; white-space: pre-wrap; font-size: .92rem; }
   .store-login-tip { color: #777; margin-top: 8px; }
@@ -36,6 +41,20 @@
 @if (TempData["StoreError"] != null)
 {
   <div class="store-alert">@TempData["StoreError"]</div>
+}
+
+@if (myLicense != null)
+{
+  <div class="store-owned">
+    @if (myPermanent)
+    {
+      <span>您已持有该应用的<strong>永久授权</strong>，无需再购买；如继续购买，授权仍保持永久。</span>
+    }
+    else
+    {
+      <span>您已持有该应用授权，当前到期时间：<strong>@myLicense.ExpireDate.ToString("yyyy-MM-dd")</strong>。购买任意方案将为这条现有授权<strong>顺延有效期</strong>（授权码不变），续费后到期时间见下方预览。</span>
+    }
+  </div>
 }
 
 <div class="store-section">
@@ -52,13 +71,17 @@
       {
         var plan = plans[i];
         <label class="store-plan">
-          <input type="radio" name="planId" value="@plan.Id" data-price="@plan.Price.ToString("0.00")" @(i == 0 ? "checked" : "") />
+          <input type="radio" name="planId" value="@plan.Id" data-price="@plan.Price.ToString("0.00")" data-days="@plan.ValidityDays" @(i == 0 ? "checked" : "") />
           <span class="pname">@plan.Name</span>
           <span class="pvalid">有效期：@ValidityText(plan.ValidityDays)</span>
           <span class="pprice">¥@plan.Price.ToString("0.00")</span>
         </label>
       }
       <p class="store-amount">应付金额：<strong id="storeAmount">¥@plans[0].Price.ToString("0.00")</strong></p>
+      @if (myLicense != null && !myPermanent)
+      {
+        <p class="store-renew" id="storeRenewInfo" data-base="@renewBase.ToString("yyyy-MM-dd")">续费后到期：<strong id="storeRenewDate"></strong></p>
+      }
       <button type="submit" class="store-btn">立即购买</button>
       @if (currentUser == null)
       {
@@ -92,10 +115,24 @@
   (function () {
     var radios = document.querySelectorAll('input[name="planId"]');
     var amount = document.getElementById('storeAmount');
+    var renewInfo = document.getElementById('storeRenewInfo');
+    var renewDate = document.getElementById('storeRenewDate');
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function updateRenew(r) {
+      if (!renewInfo || !renewDate || !r) return;
+      var days = parseInt(r.getAttribute('data-days'), 10);
+      if (isNaN(days) || days <= 0) { renewDate.textContent = '永久'; return; }
+      var parts = renewInfo.getAttribute('data-base').split('-');
+      var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      d.setDate(d.getDate() + days);
+      renewDate.textContent = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
     radios.forEach(function (r) {
       r.addEventListener('change', function () {
         if (r.checked && amount) amount.textContent = '¥' + r.getAttribute('data-price');
+        if (r.checked) updateRenew(r);
       });
+      if (r.checked) updateRenew(r);
     });
   })();
 </script>

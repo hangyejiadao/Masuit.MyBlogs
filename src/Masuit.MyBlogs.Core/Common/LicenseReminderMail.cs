@@ -22,7 +22,7 @@ var content = $"""
 <p>尊敬的 {customer}，您好：</p>
 <p>您的应用 <b>{app}</b> 授权{when}。</p>
 <p>授权码：{license.LicenseKey}<br />授权期限：{license.StartDate:yyyy-MM-dd} 至 {license.ExpireDate:yyyy-MM-dd}</p>
-<p>为避免授权到期后影响应用正常使用，请及时联系我们办理续期。</p>
+<p>为避免授权到期后影响应用正常使用，请及时续期：登录本站用户中心，在「已购 License 管理」中点击「续费延期」即可自助购买续期，或联系我们办理。</p>
 <p>—— {site}</p>
 """;
 return (title, content);
